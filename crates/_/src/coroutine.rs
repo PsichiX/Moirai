@@ -394,6 +394,8 @@ where
     let mut job = Some(Job(Box::pin(async move {
         handle.put(job.await);
     })));
+    #[cfg(debug_assertions)]
+    let creation_backtrace = std::backtrace::Backtrace::capture().to_string();
     poll_fn(move |cx| {
         let waker = cx.waker();
         if let Some(job) = job.take() {
@@ -410,6 +412,8 @@ where
                     cancel: waker.cancel(),
                     suspend: waker.suspend(),
                     meta: waker.local_meta(),
+                    #[cfg(debug_assertions)]
+                    creation_backtrace: creation_backtrace.clone(),
                 });
             }
             waker.wake_by_ref();
@@ -439,6 +443,8 @@ where
     let mut job = Some(Job(Box::pin(async move {
         handle.put(job.await);
     })));
+    #[cfg(debug_assertions)]
+    let creation_backtrace = std::backtrace::Backtrace::capture().to_string();
     poll_fn(move |cx| {
         let waker = cx.waker();
         if let Some(job) = job.take() {
@@ -455,6 +461,8 @@ where
                     cancel: waker.cancel(),
                     suspend: waker.suspend(),
                     meta: handle2.meta.clone(),
+                    #[cfg(debug_assertions)]
+                    creation_backtrace: creation_backtrace.clone(),
                 });
             }
             waker.wake_by_ref();
@@ -478,6 +486,8 @@ pub async fn queue_on<T: Send + 'static>(
     let mut job = Some(Job(Box::pin(async move {
         handle.put(job(context().await));
     })));
+    #[cfg(debug_assertions)]
+    let creation_backtrace = std::backtrace::Backtrace::capture().to_string();
     poll_fn(move |cx| {
         let waker = cx.waker();
         if let Some(job) = job.take() {
@@ -494,6 +504,8 @@ pub async fn queue_on<T: Send + 'static>(
                     cancel: waker.cancel(),
                     suspend: waker.suspend(),
                     meta: waker.local_meta(),
+                    #[cfg(debug_assertions)]
+                    creation_backtrace: creation_backtrace.clone(),
                 });
             }
             waker.wake_by_ref();
@@ -512,6 +524,8 @@ pub async fn queue_on<T: Send + 'static>(
 #[must_use]
 pub async fn on_exit(future: impl Future<Output = ()> + Send + Sync + 'static) -> OnExit {
     let mut job = Some(Job(Box::pin(future)));
+    #[cfg(debug_assertions)]
+    let creation_backtrace = std::backtrace::Backtrace::capture().to_string();
     poll_fn(move |cx| {
         let waker = cx.waker();
         let result = if let Some(waker) = JobsWaker::try_cast(waker) {
@@ -529,6 +543,8 @@ pub async fn on_exit(future: impl Future<Output = ()> + Send + Sync + 'static) -
                         cancel: waker.cancel(),
                         suspend: waker.suspend(),
                         meta: waker.local_meta(),
+                        #[cfg(debug_assertions)]
+                        creation_backtrace: creation_backtrace.clone(),
                     }),
                     queue: waker.queue(),
                 }

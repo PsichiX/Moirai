@@ -26,10 +26,33 @@ use typid::ID;
 struct Job(Pin<Box<dyn Future<Output = ()> + Send + Sync>>);
 
 impl Job {
-    fn poll(mut self, cx: &mut Context<'_>) -> Option<Self> {
-        match self.0.as_mut().poll(cx) {
-            Poll::Ready(_) => None,
-            Poll::Pending => Some(self),
+    fn poll(
+        mut self,
+        cx: &mut Context<'_>,
+        #[cfg(debug_assertions)] creation_backtrace: &str,
+    ) -> Option<Self> {
+        let poll_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            match self.0.as_mut().poll(cx) {
+                Poll::Ready(_) => None,
+                Poll::Pending => Some(self),
+            }
+        }));
+        match poll_result {
+            Ok(result) => result,
+            Err(err) => {
+                #[cfg(debug_assertions)]
+                {
+                    eprintln!("Job panicked! Creation backtrace:\n{}", creation_backtrace);
+                    if let Some(s) = err.downcast_ref::<&str>() {
+                        eprintln!("Panic info: {}", s);
+                    } else if let Some(s) = err.downcast_ref::<String>() {
+                        eprintln!("Panic info: {}", s);
+                    } else if let Some(e) = err.downcast_ref::<Box<dyn std::error::Error>>() {
+                        eprintln!("Panic error: {}", e);
+                    }
+                }
+                None
+            }
         }
     }
 }
@@ -356,6 +379,8 @@ struct JobObject {
     pub cancel: Arc<AtomicBool>,
     pub suspend: Arc<AtomicBool>,
     pub meta: Arc<RwLock<HashMap<String, DynamicManagedLazy>>>,
+    #[cfg(debug_assertions)]
+    pub creation_backtrace: String,
 }
 
 #[derive(Default, Clone)]
@@ -434,6 +459,8 @@ impl JobQueue {
         handle: JobHandle<T>,
         job: Job,
     ) -> JobHandle<T> {
+        #[cfg(debug_assertions)]
+        let creation_backtrace = std::backtrace::Backtrace::capture().to_string();
         self.enqueue(JobObject {
             id: ID::new(),
             job,
@@ -446,6 +473,8 @@ impl JobQueue {
             cancel: handle.cancel.clone(),
             suspend: handle.suspend.clone(),
             meta: handle.meta.clone(),
+            #[cfg(debug_assertions)]
+            creation_backtrace,
         });
         handle
     }
@@ -545,6 +574,8 @@ impl Worker {
                         cancel,
                         suspend,
                         meta,
+                        #[cfg(debug_assertions)]
+                        creation_backtrace,
                     } = object;
                     let mut notify_workers = false;
                     let (poll_result, receiver) = if suspend.load(Ordering::Relaxed) {
@@ -575,7 +606,11 @@ impl Worker {
                             thread_id = format!("{:?}", std::thread::current().id()),
                         )
                         .entered();
-                        let poll_result = job.poll(&mut cx);
+                        let poll_result = job.poll(
+                            &mut cx,
+                            #[cfg(debug_assertions)]
+                            &creation_backtrace,
+                        );
                         (poll_result, receiver)
                     };
                     if let Some(job) = poll_result {
@@ -601,6 +636,8 @@ impl Worker {
                                 cancel,
                                 suspend,
                                 meta,
+                                #[cfg(debug_assertions)]
+                                creation_backtrace,
                             });
                         } else {
                             pending.push(JobObject {
@@ -612,6 +649,8 @@ impl Worker {
                                 cancel,
                                 suspend,
                                 meta,
+                                #[cfg(debug_assertions)]
+                                creation_backtrace,
                             });
                         }
                     }
@@ -1100,6 +1139,8 @@ impl Jobs {
                 cancel,
                 suspend,
                 meta,
+                #[cfg(debug_assertions)]
+                creation_backtrace,
             } = object;
             let mut notify_workers = false;
             let (poll_result, receiver) = if suspend.load(Ordering::Relaxed) {
@@ -1130,7 +1171,11 @@ impl Jobs {
                     thread_id = format!("{:?}", std::thread::current().id()),
                 )
                 .entered();
-                let poll_result = job.poll(&mut cx);
+                let poll_result = job.poll(
+                    &mut cx,
+                    #[cfg(debug_assertions)]
+                    &creation_backtrace,
+                );
                 (poll_result, receiver)
             };
             if let Some(job) = poll_result {
@@ -1154,6 +1199,8 @@ impl Jobs {
                         cancel,
                         suspend,
                         meta,
+                        #[cfg(debug_assertions)]
+                        creation_backtrace,
                     });
                 } else {
                     pending.push(JobObject {
@@ -1165,6 +1212,8 @@ impl Jobs {
                         cancel,
                         suspend,
                         meta,
+                        #[cfg(debug_assertions)]
+                        creation_backtrace,
                     });
                 }
             }
@@ -1235,6 +1284,8 @@ impl Jobs {
                 cancel,
                 suspend,
                 meta,
+                #[cfg(debug_assertions)]
+                creation_backtrace,
             } = object;
             let mut notify_workers = false;
             let (poll_result, receiver) = if suspend.load(Ordering::Relaxed) {
@@ -1265,7 +1316,11 @@ impl Jobs {
                     thread_id = format!("{:?}", std::thread::current().id()),
                 )
                 .entered();
-                let poll_result = job.poll(&mut cx);
+                let poll_result = job.poll(
+                    &mut cx,
+                    #[cfg(debug_assertions)]
+                    &creation_backtrace,
+                );
                 (poll_result, receiver)
             };
             if let Some(job) = poll_result {
@@ -1289,6 +1344,8 @@ impl Jobs {
                         cancel,
                         suspend,
                         meta,
+                        #[cfg(debug_assertions)]
+                        creation_backtrace,
                     });
                 } else {
                     pending.push(JobObject {
@@ -1300,6 +1357,8 @@ impl Jobs {
                         cancel,
                         suspend,
                         meta,
+                        #[cfg(debug_assertions)]
+                        creation_backtrace,
                     });
                 }
             }
@@ -1325,6 +1384,16 @@ impl Jobs {
     #[inline]
     pub fn len(&self) -> usize {
         self.workers.len()
+    }
+
+    #[inline]
+    pub fn queue_is_empty(&self) -> bool {
+        self.queue.is_empty()
+    }
+
+    #[inline]
+    pub fn queue_len(&self) -> usize {
+        self.queue.len()
     }
 
     pub fn spawn_on<T: Send + 'static>(
@@ -1389,6 +1458,8 @@ impl Jobs {
             })));
         }
         let job = Arc::new(job);
+        #[cfg(debug_assertions)]
+        let creation_backtrace = std::backtrace::Backtrace::capture().to_string();
         let handle = AllJobsHandle {
             jobs: (0..work_groups)
                 .map(|group| {
@@ -1409,6 +1480,8 @@ impl Jobs {
                         cancel: handle.cancel.clone(),
                         suspend: handle.suspend.clone(),
                         meta: handle.meta.clone(),
+                        #[cfg(debug_assertions)]
+                        creation_backtrace: creation_backtrace.clone(),
                     });
                     handle
                 })
@@ -2068,5 +2141,25 @@ mod tests {
         }
         let result = job.try_take().unwrap().unwrap();
         assert_eq!(result, 42);
+    }
+
+    #[test]
+    fn test_futures_panic() {
+        let jobs = Jobs::default();
+
+        jobs.spawn_on(JobLocation::Local, JobPriority::Normal, async {
+            println!("About to panic...");
+            yield_now().await;
+            if true {
+                panic!("Intentional panic for testing");
+            }
+            yield_now().await;
+            42
+        })
+        .unwrap();
+
+        while !jobs.queue_is_empty() {
+            jobs.run_local();
+        }
     }
 }
