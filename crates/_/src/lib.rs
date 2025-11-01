@@ -515,9 +515,13 @@ impl JobQueue {
                     None
                 }
             }
-            (JobLocation::NonLocal, JobLocation::Local) => {
-                queue.push_front(object);
-                None
+            (JobLocation::NonLocal, b) => {
+                if b == &JobLocation::Local {
+                    queue.push_front(object);
+                    None
+                } else {
+                    Some(object)
+                }
             }
             (JobLocation::Unknown, _) => Some(object),
             _ => {
@@ -1773,7 +1777,7 @@ mod tests {
 
         let mut scope = ScopedJobs::new(&jobs);
         scope
-            .queue_on(JobLocation::Unknown, JobPriority::Normal, |_| {
+            .queue_on(JobLocation::NonLocal, JobPriority::Normal, |_| {
                 for value in &mut data {
                     *value *= 2;
                 }
