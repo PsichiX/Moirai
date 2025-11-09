@@ -582,7 +582,10 @@ impl Worker {
                         creation_backtrace,
                     } = object;
                     let mut notify_workers = false;
-                    let (poll_result, receiver) = if suspend.load(Ordering::Relaxed) {
+                    let (poll_result, receiver) = if cancel.load(Ordering::Relaxed) {
+                        let (_, rx) = std::sync::mpsc::channel();
+                        (None, rx)
+                    } else if suspend.load(Ordering::Relaxed) {
                         let (_, rx) = std::sync::mpsc::channel();
                         (Some(job), rx)
                     } else {
@@ -1147,7 +1150,10 @@ impl Jobs {
                 creation_backtrace,
             } = object;
             let mut notify_workers = false;
-            let (poll_result, receiver) = if suspend.load(Ordering::Relaxed) {
+            let (poll_result, receiver) = if cancel.load(Ordering::Relaxed) {
+                let (_, rx) = std::sync::mpsc::channel();
+                (None, rx)
+            } else if suspend.load(Ordering::Relaxed) {
                 let (_, rx) = std::sync::mpsc::channel();
                 (Some(job), rx)
             } else {
@@ -1292,7 +1298,10 @@ impl Jobs {
                 creation_backtrace,
             } = object;
             let mut notify_workers = false;
-            let (poll_result, receiver) = if suspend.load(Ordering::Relaxed) {
+            let (poll_result, receiver) = if cancel.load(Ordering::Relaxed) {
+                let (_, rx) = std::sync::mpsc::channel();
+                (None, rx)
+            } else if suspend.load(Ordering::Relaxed) {
                 let (_, rx) = std::sync::mpsc::channel();
                 (Some(job), rx)
             } else {
@@ -1378,6 +1387,17 @@ impl Jobs {
             }
         }
         self.queue.extend(pending);
+    }
+
+    pub fn block_on<T: Send + 'static>(
+        &self,
+        job: impl Future<Output = T> + Send + Sync + 'static,
+    ) {
+        let queue = JobQueue::default();
+        queue.spawn_on(JobLocation::Local, JobPriority::Normal, job);
+        while !queue.is_empty() {
+            self.run_queue(&queue);
+        }
     }
 
     #[inline]
@@ -2145,6 +2165,35 @@ mod tests {
         }
         let result = job.try_take().unwrap().unwrap();
         assert_eq!(result, 42);
+    }
+
+    #[test]
+    fn test_futures_cancel() {
+        let jobs = Jobs::default();
+
+        let result = Arc::new(AtomicUsize::new(0));
+        let result1 = result.clone();
+
+        let job = jobs
+            .spawn_on(JobLocation::Local, JobPriority::Normal, async move {
+                loop {
+                    result1.fetch_add(1, Ordering::SeqCst);
+                    yield_now().await;
+                }
+            })
+            .unwrap();
+
+        assert!(!job.is_done());
+        for _ in 0..10 {
+            jobs.run_local();
+        }
+        assert!(!job.is_done());
+
+        job.cancel();
+        let prev = result.load(Ordering::SeqCst);
+        jobs.run_local();
+        let next = result.load(Ordering::SeqCst);
+        assert_eq!(prev, next);
     }
 
     #[test]
