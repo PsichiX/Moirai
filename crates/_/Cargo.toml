@@ -1,6 +1,6 @@
 [package]
 name = "moirai"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Async/await job system for game development"

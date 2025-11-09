@@ -390,6 +390,7 @@ where
     <F as std::future::Future>::Output: std::marker::Send,
 {
     let handle = JobHandle::default();
+    let handle2 = handle.clone();
     let result = handle.clone();
     let mut job = Some(Job(Box::pin(async move {
         handle.put(job.await);
@@ -409,8 +410,8 @@ where
                     },
                     location: location.clone(),
                     priority,
-                    cancel: waker.cancel(),
-                    suspend: waker.suspend(),
+                    cancel: handle2.cancel.clone(),
+                    suspend: handle2.suspend.clone(),
                     meta: waker.local_meta(),
                     #[cfg(debug_assertions)]
                     creation_backtrace: creation_backtrace.clone(),
@@ -458,8 +459,8 @@ where
                     },
                     location: location.clone(),
                     priority,
-                    cancel: waker.cancel(),
-                    suspend: waker.suspend(),
+                    cancel: handle2.cancel.clone(),
+                    suspend: handle2.suspend.clone(),
                     meta: handle2.meta.clone(),
                     #[cfg(debug_assertions)]
                     creation_backtrace: creation_backtrace.clone(),
@@ -482,6 +483,7 @@ pub async fn queue_on<T: Send + 'static>(
     job: impl FnOnce(JobContext) -> T + Send + Sync + 'static,
 ) -> JobHandle<T> {
     let handle = JobHandle::default();
+    let handle2 = handle.clone();
     let result = handle.clone();
     let mut job = Some(Job(Box::pin(async move {
         handle.put(job(context().await));
@@ -501,8 +503,8 @@ pub async fn queue_on<T: Send + 'static>(
                     },
                     location: location.clone(),
                     priority,
-                    cancel: waker.cancel(),
-                    suspend: waker.suspend(),
+                    cancel: handle2.cancel.clone(),
+                    suspend: handle2.suspend.clone(),
                     meta: waker.local_meta(),
                     #[cfg(debug_assertions)]
                     creation_backtrace: creation_backtrace.clone(),
