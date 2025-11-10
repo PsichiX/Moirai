@@ -39,16 +39,16 @@ impl Job {
         }));
         match poll_result {
             Ok(result) => result,
-            Err(err) => {
+            Err(_err) => {
                 #[cfg(debug_assertions)]
                 {
-                    eprintln!("Job panicked! Creation backtrace:\n{}", creation_backtrace);
-                    if let Some(s) = err.downcast_ref::<&str>() {
-                        eprintln!("Panic info: {}", s);
-                    } else if let Some(s) = err.downcast_ref::<String>() {
-                        eprintln!("Panic info: {}", s);
-                    } else if let Some(e) = err.downcast_ref::<Box<dyn std::error::Error>>() {
-                        eprintln!("Panic error: {}", e);
+                    tracing::error!("Job panicked! Creation backtrace:\n{}", creation_backtrace);
+                    if let Some(s) = _err.downcast_ref::<&str>() {
+                        tracing::error!("Panic info: {}", s);
+                    } else if let Some(s) = _err.downcast_ref::<String>() {
+                        tracing::error!("Panic info: {}", s);
+                    } else if let Some(e) = _err.downcast_ref::<Box<dyn std::error::Error>>() {
+                        tracing::error!("Panic error: {}", e);
                     }
                 }
                 None
@@ -775,15 +775,19 @@ pub(crate) struct JobsWaker {
     suspend: Arc<AtomicBool>,
 }
 
-impl JobsWaker {
-    const VTABLE: RawWakerVTable =
-        RawWakerVTable::new(Self::vtable_clone, |_| {}, |_| {}, Self::vtable_drop);
+static JOBS_WAKER_VTABLE: RawWakerVTable = RawWakerVTable::new(
+    JobsWaker::vtable_clone,
+    |_| {},
+    |_| {},
+    JobsWaker::vtable_drop,
+);
 
+impl JobsWaker {
     fn vtable_clone(data: *const ()) -> RawWaker {
         let arc = unsafe { Arc::<Self>::from_raw(data as *const Self) };
         let cloned = arc.clone();
         std::mem::forget(arc);
-        RawWaker::new(Arc::into_raw(cloned) as *const (), &Self::VTABLE)
+        RawWaker::new(Arc::into_raw(cloned) as *const (), &JOBS_WAKER_VTABLE)
     }
 
     fn vtable_drop(data: *const ()) {
@@ -817,12 +821,12 @@ impl JobsWaker {
             cancel,
             suspend,
         });
-        let raw = RawWaker::new(Arc::into_raw(arc) as *const (), &Self::VTABLE);
+        let raw = RawWaker::new(Arc::into_raw(arc) as *const (), &JOBS_WAKER_VTABLE);
         (unsafe { Waker::from_raw(raw) }, receiver)
     }
 
     pub fn try_cast(waker: &Waker) -> Option<&Self> {
-        if waker.vtable() == &Self::VTABLE {
+        if std::ptr::eq(waker.vtable(), &JOBS_WAKER_VTABLE) {
             unsafe { waker.data().cast::<Self>().as_ref() }
         } else {
             None
