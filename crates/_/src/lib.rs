@@ -1390,7 +1390,7 @@ impl Jobs {
                 break;
             }
         }
-        self.queue.extend(pending);
+        queue.extend(pending);
     }
 
     pub fn block_on<T: Send + 'static>(
@@ -2218,5 +2218,20 @@ mod tests {
         while !jobs.queue_is_empty() {
             jobs.run_local();
         }
+    }
+
+    #[test]
+    fn test_futures_block_on() {
+        let counter = Arc::new(AtomicUsize::new(0));
+        let counter1 = counter.clone();
+
+        Jobs::default().block_on(async move {
+            for _ in 0..10 {
+                counter1.fetch_add(1, Ordering::SeqCst);
+                yield_now().await;
+            }
+        });
+
+        assert_eq!(counter.load(Ordering::SeqCst), 10);
     }
 }
