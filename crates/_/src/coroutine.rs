@@ -1,6 +1,6 @@
-use crate::{
-    Job, JobContext, JobHandle, JobLocation, JobObject, JobPriority, JobQueue, JobToken, JobsWaker,
-    JobsWakerCommand,
+use crate::jobs::{
+    Job, JobContext, JobHandle, JobLocation, JobObject, JobOptions, JobPriority, JobQueue,
+    JobToken, JobsWaker, JobsWakerCommand,
 };
 #[cfg(target_arch = "wasm32")]
 use instant::{Duration, Instant};
@@ -380,16 +380,12 @@ pub async fn change_priority(priority: JobPriority) {
     .await
 }
 
-pub async fn spawn_on<F>(
-    location: JobLocation,
-    priority: JobPriority,
-    job: F,
-) -> JobHandle<F::Output>
-where
-    F: Future + Send + Sync + 'static,
-    <F as std::future::Future>::Output: std::marker::Send,
-{
-    let handle = JobHandle::default();
+pub async fn spawn_on<T: Send + 'static>(
+    options: impl Into<JobOptions>,
+    job: impl Future<Output = T> + Send + Sync + 'static,
+) -> JobHandle<T> {
+    let options = options.into();
+    let handle = JobHandle::default().with_meta(options.meta);
     let handle2 = handle.clone();
     let result = handle.clone();
     let mut job = Some(Job(Box::pin(async move {
@@ -408,8 +404,8 @@ where
                         work_group_index: 0,
                         work_groups_count: 1,
                     },
-                    location: location.clone(),
-                    priority,
+                    location: options.location.clone(),
+                    priority: options.priority,
                     cancel: handle2.cancel.clone(),
                     suspend: handle2.suspend.clone(),
                     meta: waker.local_meta(),
@@ -428,61 +424,12 @@ where
     result
 }
 
-pub async fn spawn_on_with_meta<F>(
-    location: JobLocation,
-    priority: JobPriority,
-    meta: impl IntoIterator<Item = (String, DynamicManagedLazy)>,
-    job: F,
-) -> JobHandle<F::Output>
-where
-    F: Future + Send + Sync + 'static,
-    <F as std::future::Future>::Output: std::marker::Send,
-{
-    let handle = JobHandle::default().with_meta(meta);
-    let handle2 = handle.clone();
-    let result = handle.clone();
-    let mut job = Some(Job(Box::pin(async move {
-        handle.put(job.await);
-    })));
-    #[cfg(debug_assertions)]
-    let creation_backtrace = std::backtrace::Backtrace::capture().to_string();
-    poll_fn(move |cx| {
-        let waker = cx.waker();
-        if let Some(job) = job.take() {
-            if let Some(waker) = JobsWaker::try_cast(waker) {
-                waker.enqueue(JobObject {
-                    id: ID::new(),
-                    job,
-                    context: JobContext {
-                        work_group_index: 0,
-                        work_groups_count: 1,
-                    },
-                    location: location.clone(),
-                    priority,
-                    cancel: handle2.cancel.clone(),
-                    suspend: handle2.suspend.clone(),
-                    meta: handle2.meta.clone(),
-                    #[cfg(debug_assertions)]
-                    creation_backtrace: creation_backtrace.clone(),
-                });
-            }
-            waker.wake_by_ref();
-            Poll::Pending
-        } else {
-            waker.wake_by_ref();
-            Poll::Ready(())
-        }
-    })
-    .await;
-    result
-}
-
 pub async fn queue_on<T: Send + 'static>(
-    location: JobLocation,
-    priority: JobPriority,
+    options: impl Into<JobOptions>,
     job: impl FnOnce(JobContext) -> T + Send + Sync + 'static,
 ) -> JobHandle<T> {
-    let handle = JobHandle::default();
+    let options = options.into();
+    let handle = JobHandle::default().with_meta(options.meta);
     let handle2 = handle.clone();
     let result = handle.clone();
     let mut job = Some(Job(Box::pin(async move {
@@ -501,8 +448,8 @@ pub async fn queue_on<T: Send + 'static>(
                         work_group_index: 0,
                         work_groups_count: 1,
                     },
-                    location: location.clone(),
-                    priority,
+                    location: options.location.clone(),
+                    priority: options.priority,
                     cancel: handle2.cancel.clone(),
                     suspend: handle2.suspend.clone(),
                     meta: waker.local_meta(),
