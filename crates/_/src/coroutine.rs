@@ -4,7 +4,10 @@ use crate::jobs::{
 };
 #[cfg(target_arch = "wasm32")]
 use instant::{Duration, Instant};
-use intuicio_data::managed::{DynamicManagedLazy, ManagedLazy};
+use intuicio_data::{
+    lifetime::LifetimeWeakState,
+    managed::{DynamicManagedLazy, ManagedLazy},
+};
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::{Duration, Instant};
 use std::{
@@ -380,7 +383,7 @@ pub async fn change_priority(priority: JobPriority) {
     .await
 }
 
-pub async fn spawn_on<T: Send + 'static>(
+pub async fn spawn<T: Send + 'static>(
     options: impl Into<JobOptions>,
     job: impl Future<Output = T> + Send + Sync + 'static,
 ) -> JobHandle<T> {
@@ -424,7 +427,7 @@ pub async fn spawn_on<T: Send + 'static>(
     result
 }
 
-pub async fn queue_on<T: Send + 'static>(
+pub async fn queue<T: Send + 'static>(
     options: impl Into<JobOptions>,
     job: impl FnOnce(JobContext) -> T + Send + Sync + 'static,
 ) -> JobHandle<T> {
@@ -506,5 +509,31 @@ pub async fn on_exit(future: impl Future<Output = ()> + Send + Sync + 'static) -
         waker.wake_by_ref();
         Poll::Ready(result)
     })
+    .await
+}
+
+pub async fn cancellable<F: Future>(condition: impl Fn() -> bool, future: F) -> Option<F::Output> {
+    let mut future = Box::pin(future);
+    poll_fn(move |cx| {
+        if condition() {
+            cx.waker().wake_by_ref();
+            Poll::Ready(None)
+        } else {
+            cx.waker().wake_by_ref();
+            future.as_mut().poll(cx).map(Some)
+        }
+    })
+    .await
+}
+
+pub async fn lifetime_bound<F: Future>(
+    lifetimes: impl IntoIterator<Item = LifetimeWeakState>,
+    future: F,
+) -> Option<F::Output> {
+    let states = lifetimes.into_iter().collect::<Vec<_>>();
+    cancellable(
+        || states.iter().any(|state| state.upgrade().is_none()),
+        future,
+    )
     .await
 }

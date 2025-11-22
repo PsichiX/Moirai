@@ -5,7 +5,7 @@ use intuicio_data::managed::{DynamicManagedLazy, ManagedLazy};
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::{Duration, Instant};
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashMap, HashSet, LinkedList},
     error::Error,
     hash::{DefaultHasher, Hash, Hasher},
     pin::Pin,
@@ -447,7 +447,7 @@ pub(crate) struct JobObject {
 
 #[derive(Default, Clone)]
 pub struct JobQueue {
-    queue: Arc<RwLock<VecDeque<JobObject>>>,
+    queue: Arc<RwLock<LinkedList<JobObject>>>,
 }
 
 impl JobQueue {
@@ -467,11 +467,11 @@ impl JobQueue {
 
     pub fn append(&self, other: &Self) {
         if let Ok(mut other_queue) = other.queue.write() {
-            self.extend(other_queue.drain(..));
+            self.extend(std::mem::take(&mut *other_queue));
         }
     }
 
-    pub fn spawn_on<T: Send + 'static>(
+    pub fn spawn<T: Send + 'static>(
         &self,
         options: impl Into<JobOptions>,
         job: impl Future<Output = T> + Send + Sync + 'static,
@@ -485,7 +485,7 @@ impl JobQueue {
         self.schedule(options.location, options.priority, handle, job)
     }
 
-    pub fn queue_on<T: Send + 'static>(
+    pub fn queue<T: Send + 'static>(
         &self,
         options: impl Into<JobOptions>,
         job: impl FnOnce(JobContext) -> T + Send + Sync + 'static,
@@ -539,7 +539,7 @@ impl JobQueue {
     fn dequeue(&self, target_location: &JobLocation, ignore_location: bool) -> Option<JobObject> {
         let mut queue = self.queue.write().ok()?;
         let object = queue.pop_back()?;
-        if ignore_location {
+        if ignore_location || object.location == JobLocation::Exclusive {
             return Some(object);
         }
         match (&object.location, target_location) {
@@ -616,6 +616,16 @@ impl Worker {
                     return;
                 }
                 while let Some(object) = queue.dequeue(&worker_location2, false) {
+                    if object.location == JobLocation::Exclusive {
+                        Self::exclusive(
+                            object,
+                            queue.clone(),
+                            global_meta.clone(),
+                            Default::default(),
+                            hash_tokens.clone(),
+                        );
+                        continue;
+                    }
                     let JobObject {
                         id,
                         job,
@@ -745,70 +755,96 @@ impl Worker {
         }
     }
 
-    fn one_shot(
+    fn exclusive(
+        job: JobObject,
         queue: JobQueue,
         global_meta: Arc<RwLock<HashMap<String, DynamicManagedLazy>>>,
         worker_meta: Arc<RwLock<HashMap<String, DynamicManagedLazy>>>,
         hash_tokens: Arc<Mutex<HashSet<u64>>>,
-    ) {
-        let terminate = Arc::new(AtomicBool::default());
-        let terminate2 = terminate.clone();
+    ) -> JoinHandle<()> {
         spawn(move || {
-            let mut pending = vec![];
-            while !queue.is_empty() {
-                if terminate2.load(Ordering::Relaxed) {
+            let mut pending = Some(job);
+            loop {
+                let Some(object) = pending.take() else {
                     return;
-                }
-                while let Some(object) = queue.dequeue(&JobLocation::Unknown, true) {
-                    let JobObject {
-                        id,
-                        job,
+                };
+                let JobObject {
+                    id,
+                    job,
+                    context,
+                    location,
+                    mut priority,
+                    cancel,
+                    suspend,
+                    meta,
+                    #[cfg(debug_assertions)]
+                    creation_backtrace,
+                } = object;
+                let (poll_result, receiver) = if cancel.load(Ordering::Relaxed) {
+                    let (_, rx) = std::sync::mpsc::channel();
+                    (None, rx)
+                } else if suspend.load(Ordering::Relaxed) {
+                    let (_, rx) = std::sync::mpsc::channel();
+                    (Some(job), rx)
+                } else {
+                    let (waker, receiver) = JobsWaker::new_waker(
+                        queue.clone(),
+                        location.clone(),
                         context,
-                        location,
                         priority,
-                        cancel,
-                        suspend,
-                        meta,
+                        global_meta.clone(),
+                        worker_meta.clone(),
+                        meta.clone(),
+                        hash_tokens.clone(),
+                        cancel.clone(),
+                        suspend.clone(),
+                    );
+                    let mut cx = Context::from_waker(&waker);
+                    #[cfg(feature = "tracing")]
+                    let _span = tracing::span!(
+                        tracing::Level::TRACE,
+                        "Job poll",
+                        id = id.to_string(),
+                        location = location.to_string(),
+                        context = context.to_string(),
+                        priority = priority.to_string(),
+                        thread_id = format!("{:?}", std::thread::current().id()),
+                    )
+                    .entered();
+                    let poll_result = job.poll(
+                        &mut cx,
                         #[cfg(debug_assertions)]
-                        creation_backtrace,
-                    } = object;
-                    let poll_result = if cancel.load(Ordering::Relaxed) {
-                        None
-                    } else if suspend.load(Ordering::Relaxed) {
-                        Some(job)
-                    } else {
-                        let (waker, _) = JobsWaker::new_waker(
-                            queue.clone(),
-                            location.clone(),
+                        &creation_backtrace,
+                    );
+                    (poll_result, receiver)
+                };
+                if let Some(job) = poll_result {
+                    let mut move_to = None;
+                    for command in receiver.try_iter() {
+                        match command {
+                            JobsWakerCommand::MoveTo(location) => {
+                                move_to = Some(location);
+                            }
+                            JobsWakerCommand::ChangePriority(new_priority) => {
+                                priority = new_priority;
+                            }
+                        }
+                    }
+                    if let Some(location) = move_to {
+                        queue.enqueue(JobObject {
+                            id,
+                            job,
                             context,
+                            location,
                             priority,
-                            global_meta.clone(),
-                            worker_meta.clone(),
-                            meta.clone(),
-                            hash_tokens.clone(),
-                            cancel.clone(),
-                            suspend.clone(),
-                        );
-                        let mut cx = Context::from_waker(&waker);
-                        #[cfg(feature = "tracing")]
-                        let _span = tracing::span!(
-                            tracing::Level::TRACE,
-                            "Job poll",
-                            id = id.to_string(),
-                            location = location.to_string(),
-                            context = context.to_string(),
-                            priority = priority.to_string(),
-                            thread_id = format!("{:?}", std::thread::current().id()),
-                        )
-                        .entered();
-                        job.poll(
-                            &mut cx,
+                            cancel,
+                            suspend,
+                            meta,
                             #[cfg(debug_assertions)]
-                            &creation_backtrace,
-                        )
-                    };
-                    if let Some(job) = poll_result {
-                        pending.push(JobObject {
+                            creation_backtrace,
+                        });
+                    } else {
+                        pending = Some(JobObject {
                             id,
                             job,
                             context,
@@ -821,13 +857,9 @@ impl Worker {
                             creation_backtrace,
                         });
                     }
-                    if terminate2.load(Ordering::Relaxed) {
-                        return;
-                    }
                 }
-                queue.extend(pending.drain(..));
             }
-        });
+        })
     }
 }
 
@@ -846,6 +878,7 @@ pub enum JobLocation {
     NamedWorker(String),
     ExactThread(ThreadId),
     OtherThanThread(ThreadId),
+    Exclusive,
 }
 
 impl JobLocation {
@@ -876,6 +909,7 @@ impl std::fmt::Display for JobLocation {
             JobLocation::NamedWorker(name) => write!(f, "Named worker: {name}"),
             JobLocation::ExactThread(id) => write!(f, "Exact thread: {id:?}"),
             JobLocation::OtherThanThread(id) => write!(f, "Other than thread: {id:?}"),
+            JobLocation::Exclusive => write!(f, "Exclusive"),
         }
     }
 }
@@ -1273,6 +1307,16 @@ impl Jobs {
             .queue
             .dequeue(&JobLocation::Local, self.workers.is_empty())
         {
+            if object.location == JobLocation::Exclusive {
+                Worker::exclusive(
+                    object,
+                    self.queue.clone(),
+                    self.meta.clone(),
+                    Default::default(),
+                    self.hash_tokens.clone(),
+                );
+                continue;
+            }
             let JobObject {
                 id,
                 job,
@@ -1421,6 +1465,16 @@ impl Jobs {
         let mut pending = vec![];
         let worker_meta = Arc::new(RwLock::new(meta.into_iter().collect::<HashMap<_, _>>()));
         while let Some(object) = queue.dequeue(&JobLocation::Unknown, true) {
+            if object.location == JobLocation::Exclusive {
+                Worker::exclusive(
+                    object,
+                    queue.clone(),
+                    self.meta.clone(),
+                    Default::default(),
+                    self.hash_tokens.clone(),
+                );
+                continue;
+            }
             let JobObject {
                 id,
                 job,
@@ -1530,7 +1584,7 @@ impl Jobs {
         job: impl Future<Output = T> + Send + Sync + 'static,
     ) {
         let queue = JobQueue::default();
-        queue.spawn_on(JobLocation::Local, job);
+        queue.spawn(JobLocation::Local, job);
         while !queue.is_empty() {
             self.run_queue(&queue);
         }
@@ -1556,34 +1610,89 @@ impl Jobs {
         self.queue.len()
     }
 
-    pub fn one_shot<T: Send + 'static>(
-        &self,
-        options: impl Into<JobOptions>,
-        job: impl Future<Output = T> + Send + Sync + 'static,
-    ) -> JobHandle<T> {
-        let options = options.into();
-        let handle = JobHandle::<T>::default().with_meta(options.meta);
-        let handle2 = handle.clone();
-        let job = Job(Box::pin(async move {
-            handle2.put(job.await);
-        }));
-        let queue = JobQueue::default();
-        let result = queue.schedule(options.location, options.priority, handle, job);
-        Worker::one_shot(
-            queue,
-            self.meta.clone(),
-            Default::default(),
-            self.hash_tokens.clone(),
-        );
-        result
-    }
+    // fn exclusive_spawn<T: Send + 'static>(
+    //     &self,
+    //     priority: JobPriority,
+    //     meta: HashMap<String, DynamicManagedLazy>,
+    //     job: impl Future<Output = T> + Send + Sync + 'static,
+    // ) -> Result<JobHandle<T>, Box<dyn Error>> {
+    //     #[cfg(debug_assertions)]
+    //     let creation_backtrace = std::backtrace::Backtrace::capture().to_string();
+    //     let handle = JobHandle::<T>::default().with_meta(meta);
+    //     let handle2 = handle.clone();
+    //     let job = Job(Box::pin(async move {
+    //         handle2.put(job.await);
+    //     }));
+    //     let job = JobObject {
+    //         id: ID::new(),
+    //         job,
+    //         context: JobContext {
+    //             work_group_index: 0,
+    //             work_groups_count: 1,
+    //         },
+    //         location: JobLocation::Exclusive,
+    //         priority,
+    //         cancel: handle.cancel.clone(),
+    //         suspend: handle.suspend.clone(),
+    //         meta: handle.meta.clone(),
+    //         #[cfg(debug_assertions)]
+    //         creation_backtrace,
+    //     };
+    //     Worker::exclusive(
+    //         job,
+    //         self.queue.clone(),
+    //         self.meta.clone(),
+    //         Default::default(),
+    //         self.hash_tokens.clone(),
+    //     );
+    //     Ok(handle)
+    // }
 
-    pub fn spawn_on<T: Send + 'static>(
+    // fn exclusive_queue<T: Send + 'static>(
+    //     &self,
+    //     priority: JobPriority,
+    //     meta: HashMap<String, DynamicManagedLazy>,
+    //     job: impl FnOnce(JobContext) -> T + Send + Sync + 'static,
+    // ) -> Result<JobHandle<T>, Box<dyn Error>> {
+    //     #[cfg(debug_assertions)]
+    //     let creation_backtrace = std::backtrace::Backtrace::capture().to_string();
+    //     let handle = JobHandle::<T>::default().with_meta(meta);
+    //     let handle2 = handle.clone();
+    //     let job = Job(Box::pin(async move {
+    //         handle2.put(job(context().await));
+    //     }));
+    //     let job = JobObject {
+    //         id: ID::new(),
+    //         job,
+    //         context: JobContext {
+    //             work_group_index: 0,
+    //             work_groups_count: 1,
+    //         },
+    //         location: JobLocation::Exclusive,
+    //         priority,
+    //         cancel: handle.cancel.clone(),
+    //         suspend: handle.suspend.clone(),
+    //         meta: handle.meta.clone(),
+    //         #[cfg(debug_assertions)]
+    //         creation_backtrace,
+    //     };
+    //     Worker::exclusive(
+    //         job,
+    //         self.queue.clone(),
+    //         self.meta.clone(),
+    //         Default::default(),
+    //         self.hash_tokens.clone(),
+    //     );
+    //     Ok(handle)
+    // }
+
+    pub fn spawn<T: Send + 'static>(
         &self,
         options: impl Into<JobOptions>,
         job: impl Future<Output = T> + Send + Sync + 'static,
     ) -> Result<JobHandle<T>, Box<dyn Error>> {
-        let handle = self.queue.spawn_on(options, job);
+        let options = options.into();
+        let handle = self.queue.spawn(options, job);
         let (lock, cvar) = &*self.notify;
         let mut running = lock.lock().map_err(|error| format!("{error}"))?;
         *running = true;
@@ -1591,12 +1700,13 @@ impl Jobs {
         Ok(handle)
     }
 
-    pub fn queue_on<T: Send + 'static>(
+    pub fn queue<T: Send + 'static>(
         &self,
         options: impl Into<JobOptions>,
         job: impl FnOnce(JobContext) -> T + Send + Sync + 'static,
     ) -> Result<JobHandle<T>, Box<dyn Error>> {
-        let handle = self.queue.queue_on(options, job);
+        let options = options.into();
+        let handle = self.queue.queue(options, job);
         let (lock, cvar) = &*self.notify;
         let mut running = lock.lock().map_err(|error| format!("{error}"))?;
         *running = true;
@@ -1679,22 +1789,7 @@ impl<'env, T: Send + 'static> ScopedJobs<'env, T> {
         }
     }
 
-    pub fn one_shot(
-        &mut self,
-        options: impl Into<JobOptions>,
-        job: impl Future<Output = T> + Send + Sync + 'env,
-    ) {
-        let job = unsafe {
-            std::mem::transmute::<
-                Pin<Box<dyn Future<Output = T> + Send + Sync + 'env>>,
-                Pin<Box<dyn Future<Output = T> + Send + Sync + 'static>>,
-            >(Box::pin(job))
-        };
-        let handle = self.jobs.one_shot(options, job);
-        self.handles.add(handle);
-    }
-
-    pub fn spawn_on(
+    pub fn spawn(
         &mut self,
         options: impl Into<JobOptions>,
         job: impl Future<Output = T> + Send + Sync + 'env,
@@ -1705,12 +1800,12 @@ impl<'env, T: Send + 'static> ScopedJobs<'env, T> {
                 Pin<Box<dyn Future<Output = T> + Send + Sync + 'static>>,
             >(Box::pin(job))
         };
-        let handle = self.jobs.spawn_on(options, job)?;
+        let handle = self.jobs.spawn(options, job)?;
         self.handles.add(handle);
         Ok(())
     }
 
-    pub fn queue_on(
+    pub fn queue(
         &mut self,
         options: impl Into<JobOptions>,
         job: impl FnOnce(JobContext) -> T + Send + Sync + 'env,
@@ -1721,7 +1816,7 @@ impl<'env, T: Send + 'static> ScopedJobs<'env, T> {
                 Box<dyn FnOnce(JobContext) -> T + Send + Sync + 'static>,
             >(Box::new(job))
         };
-        self.handles.add(self.jobs.queue_on(options, job)?);
+        self.handles.add(self.jobs.queue(options, job)?);
         Ok(())
     }
 
@@ -1768,7 +1863,7 @@ impl<'env, T: Send + 'static> ScopedJobs<'env, T> {
 mod tests {
     use super::*;
     use crate::coroutine::{
-        acquire_token, block_on, location, meta, move_to, on_exit, queue_on, spawn_on, suspend,
+        acquire_token, block_on, location, meta, move_to, on_exit, queue, spawn, suspend,
         wait_polls, wait_time, with_all, with_any, yield_now,
     };
     use std::sync::atomic::AtomicUsize;
@@ -1784,14 +1879,14 @@ mod tests {
         let data2 = data.clone();
 
         let job = jobs
-            .queue_on((), move |_| data.into_iter().sum::<usize>())
+            .queue((), move |_| data.into_iter().sum::<usize>())
             .unwrap();
 
         let result = job.wait().unwrap();
         assert_eq!(result, 4950);
 
         let job = jobs
-            .queue_on(JobLocation::Local, move |_| {
+            .queue(JobLocation::Local, move |_| {
                 data2.into_iter().sum::<usize>()
             })
             .unwrap();
@@ -1830,7 +1925,7 @@ mod tests {
         let data6 = data.clone();
 
         let job = jobs
-            .queue_on((), move |_| data.into_iter().sum::<usize>())
+            .queue((), move |_| data.into_iter().sum::<usize>())
             .unwrap();
 
         while !job.is_done() {
@@ -1840,7 +1935,7 @@ mod tests {
         assert_eq!(result, 4950);
 
         let job = jobs
-            .queue_on(JobLocation::Local, move |_| {
+            .queue(JobLocation::Local, move |_| {
                 data2.into_iter().sum::<usize>()
             })
             .unwrap();
@@ -1852,7 +1947,7 @@ mod tests {
         assert_eq!(result, 4950);
 
         let job = jobs
-            .queue_on(JobLocation::UnnamedWorker, move |_| {
+            .queue(JobLocation::UnnamedWorker, move |_| {
                 data3.into_iter().sum::<usize>()
             })
             .unwrap();
@@ -1864,7 +1959,7 @@ mod tests {
         assert_eq!(result, 4950);
 
         let job = jobs
-            .queue_on(JobLocation::named_worker("temp"), move |_| {
+            .queue(JobLocation::named_worker("temp"), move |_| {
                 data4.into_iter().sum::<usize>()
             })
             .unwrap();
@@ -1876,7 +1971,7 @@ mod tests {
         assert_eq!(result, 4950);
 
         let job = jobs
-            .queue_on(JobLocation::current_thread(), move |_| {
+            .queue(JobLocation::current_thread(), move |_| {
                 data5.into_iter().sum::<usize>()
             })
             .unwrap();
@@ -1888,7 +1983,7 @@ mod tests {
         assert_eq!(result, 4950);
 
         let job = jobs
-            .queue_on(JobLocation::other_than_current_thread(), move |_| {
+            .queue(JobLocation::other_than_current_thread(), move |_| {
                 data6.into_iter().sum::<usize>()
             })
             .unwrap();
@@ -1922,7 +2017,7 @@ mod tests {
         let queue = JobQueue::default();
         let data = (0..100).collect::<Vec<_>>();
 
-        let job = queue.queue_on((), move |_| data.into_iter().sum::<usize>());
+        let job = queue.queue((), move |_| data.into_iter().sum::<usize>());
 
         while !job.is_done() {
             jobs.run_queue(&queue);
@@ -1938,7 +2033,7 @@ mod tests {
 
         let mut scope = ScopedJobs::new(&jobs);
         scope
-            .queue_on(JobLocation::NonLocal, |_| {
+            .queue(JobLocation::NonLocal, |_| {
                 for value in &mut data {
                     *value *= 2;
                 }
@@ -1955,9 +2050,10 @@ mod tests {
         let jobs = Jobs::default();
         let data = (0..100).collect::<Vec<_>>();
         let data2 = data.clone();
+        let data3 = data.clone();
 
         let job = jobs
-            .spawn_on((), async move {
+            .spawn((), async move {
                 let mut result = 0;
                 for value in data {
                     result += value;
@@ -1966,12 +2062,11 @@ mod tests {
                 result
             })
             .unwrap();
-
         let result = block_on(job).unwrap();
         assert_eq!(result, 4950);
 
         let job = jobs
-            .spawn_on(JobLocation::Local, async move {
+            .spawn(JobLocation::Local, async move {
                 let mut result = 0;
                 for value in data2 {
                     result += value;
@@ -1980,7 +2075,6 @@ mod tests {
                 result
             })
             .unwrap();
-
         while !job.is_done() {
             jobs.run_local();
         }
@@ -1988,7 +2082,7 @@ mod tests {
         assert_eq!(result, 4950);
 
         let job = jobs
-            .spawn_on((), async {
+            .spawn((), async {
                 let result = Arc::new(AtomicUsize::new(0));
                 let result1 = result.clone();
                 let result2 = result.clone();
@@ -2010,7 +2104,7 @@ mod tests {
         assert_eq!(result, 3);
 
         let job = jobs
-            .spawn_on((), async {
+            .spawn((), async {
                 let result = Arc::new(AtomicUsize::new(0));
                 let result1 = result.clone();
                 let result2 = result.clone();
@@ -2030,26 +2124,64 @@ mod tests {
             .unwrap();
         let result = block_on(job).unwrap();
         assert!(result > 0);
+
+        let workers_count = jobs.workers.len();
+        let job = jobs
+            .spawn(JobLocation::Exclusive, async {
+                let mut result = 0;
+                for value in data3 {
+                    result += value;
+                    yield_now().await;
+                }
+                result
+            })
+            .unwrap();
+        let result = block_on(job).unwrap();
+        assert_eq!(result, 4950);
+        assert_eq!(jobs.workers.len(), workers_count);
     }
 
     #[test]
     fn test_futures_move() {
         let jobs = Jobs::new(1).with_named_worker("foo");
+        let unnamed_thread_id = jobs.workers[0].thread.as_ref().unwrap().thread().id();
+        let named_thread_id = jobs.workers[1].thread.as_ref().unwrap().thread().id();
+        let host_thread_id = std::thread::current().id();
 
         let job = jobs
-            .spawn_on(JobLocation::Local, async {
+            .spawn(JobLocation::Local, async move {
                 yield_now().await;
-                // A: Local
-                println!("A: {:?}", location().await);
+                let a_thread_id = std::thread::current().id();
+                assert_eq!(a_thread_id, host_thread_id);
+                assert_eq!(location().await, JobLocation::Local);
                 move_to(JobLocation::Unknown).await;
-                // B: UnnamedWorker
-                println!("B: {:?}", location().await);
+
+                let b_thread_id = std::thread::current().id();
+                assert!(
+                    b_thread_id == unnamed_thread_id
+                        || b_thread_id == named_thread_id
+                        || b_thread_id == host_thread_id
+                );
+                assert_eq!(location().await, JobLocation::Unknown);
                 move_to(JobLocation::named_worker("foo")).await;
-                // C: NamedWorker("foo")
-                println!("C: {:?}", location().await);
+
+                let c_thread_id = std::thread::current().id();
+                assert_eq!(c_thread_id, named_thread_id);
+                assert_eq!(location().await, JobLocation::named_worker("foo"));
+                move_to(JobLocation::Exclusive).await;
+
+                let d_thread_id = std::thread::current().id();
+                assert!(
+                    d_thread_id != unnamed_thread_id
+                        && d_thread_id != named_thread_id
+                        && d_thread_id != host_thread_id
+                );
+                assert_eq!(location().await, JobLocation::Exclusive);
                 move_to(JobLocation::Local).await;
-                // D: Local
-                println!("D: {:?}", location().await);
+
+                let e_thread_id = std::thread::current().id();
+                assert_eq!(e_thread_id, host_thread_id);
+                assert_eq!(location().await, JobLocation::Local);
                 42
             })
             .unwrap();
@@ -2066,29 +2198,37 @@ mod tests {
         let jobs = Jobs::new(1).with_named_worker("foo");
 
         let job = jobs
-            .spawn_on(JobLocation::Local, async {
-                spawn_on(JobLocation::Local, async {
+            .spawn(JobLocation::Local, async {
+                spawn(JobLocation::Local, async {
                     println!("A: {:?}", location().await);
                 })
                 .await;
-                spawn_on((), async {
+                spawn((), async {
                     println!("B: {:?}", location().await);
                 })
                 .await;
-                spawn_on(JobLocation::named_worker("foo"), async {
+                spawn(JobLocation::named_worker("foo"), async {
                     println!("C: {:?}", location().await);
                 })
                 .await;
-                queue_on(JobLocation::Local, |_| {
-                    println!("D: Local closure");
+                spawn(JobLocation::Exclusive, async {
+                    println!("D: {:?}", location().await);
                 })
                 .await;
-                queue_on((), |_| {
-                    println!("E: Unnamed worker closure");
+                queue(JobLocation::Local, |_| {
+                    println!("E: Local closure");
                 })
                 .await;
-                queue_on(JobLocation::named_worker("foo"), |_| {
-                    println!("F: Named worker closure");
+                queue((), |_| {
+                    println!("F: Unnamed worker closure");
+                })
+                .await;
+                queue(JobLocation::named_worker("foo"), |_| {
+                    println!("G: Named worker closure");
+                })
+                .await;
+                queue(JobLocation::Exclusive, |_| {
+                    println!("H: Exclusive worker closure");
                 })
                 .await;
                 42
@@ -2110,7 +2250,7 @@ mod tests {
         jobs.set_meta("value", value_lazy);
 
         let job = jobs
-            .spawn_on((), async {
+            .spawn((), async {
                 let value = meta::<usize>("value").await.unwrap();
                 *value.read().unwrap()
             })
@@ -2122,7 +2262,7 @@ mod tests {
         let mut flag = true;
         let (flag_lazy, _flag_lifetime) = DynamicManagedLazy::make(&mut flag);
         let job = jobs
-            .spawn_on(JobOptions::default().meta("flag", flag_lazy), async {
+            .spawn(JobOptions::default().meta("flag", flag_lazy), async {
                 let flag = meta::<bool>("flag").await.unwrap();
                 *flag.read().unwrap()
             })
@@ -2134,7 +2274,7 @@ mod tests {
         let mut flag = true;
         let (flag_lazy, _flag_lifetime) = DynamicManagedLazy::make(&mut flag);
         let job = jobs
-            .spawn_on(JobLocation::Local, async {
+            .spawn(JobLocation::Local, async {
                 let flag = meta::<bool>("flag").await.unwrap();
                 *flag.read().unwrap()
             })
@@ -2152,7 +2292,7 @@ mod tests {
         let jobs = Jobs::new(3);
 
         let a = jobs
-            .spawn_on((), async {
+            .spawn((), async {
                 let _token = acquire_token(&"foo").await;
                 std::thread::sleep(Duration::from_millis(50));
                 for i in 0..10 {
@@ -2162,7 +2302,7 @@ mod tests {
             })
             .unwrap();
         let b = jobs
-            .spawn_on((), async {
+            .spawn((), async {
                 let _token = acquire_token(&"foo").await;
                 std::thread::sleep(Duration::from_millis(50));
                 for i in 10..20 {
@@ -2193,13 +2333,13 @@ mod tests {
             let content = "Hello, Jobs!".repeat(1000);
 
             let a = jobs
-                .spawn_on((), async move {
+                .spawn((), async move {
                     std::thread::sleep(Duration::from_millis(50));
                     save_file(PATH, &content).await;
                 })
                 .unwrap();
             let b = jobs
-                .spawn_on((), async {
+                .spawn((), async {
                     std::thread::sleep(Duration::from_millis(50));
                     let _ = load_file(PATH).await;
                 })
@@ -2215,7 +2355,7 @@ mod tests {
         let state = Arc::new(AtomicBool::new(false));
         let state1 = state.clone();
         let job = jobs
-            .spawn_on((), async {
+            .spawn((), async {
                 let _exit = on_exit(async move {
                     state1.store(true, Ordering::SeqCst);
                 })
@@ -2232,7 +2372,7 @@ mod tests {
         let state = Arc::new(AtomicBool::new(false));
         let state1 = state.clone();
         let job = jobs
-            .spawn_on((), async {
+            .spawn((), async {
                 let exit = on_exit(async move {
                     state1.store(true, Ordering::SeqCst);
                 })
@@ -2250,7 +2390,7 @@ mod tests {
         let state = Arc::new(AtomicBool::new(false));
         let state1 = state.clone();
         let job = jobs
-            .spawn_on(JobLocation::Local, async {
+            .spawn(JobLocation::Local, async {
                 let exit = on_exit(async move {
                     state1.store(true, Ordering::SeqCst);
                 })
@@ -2275,7 +2415,7 @@ mod tests {
         let jobs = Jobs::default();
 
         let job = jobs
-            .spawn_on(JobLocation::Local, async {
+            .spawn(JobLocation::Local, async {
                 suspend().await;
                 42
             })
@@ -2303,7 +2443,7 @@ mod tests {
         let result1 = result.clone();
 
         let job = jobs
-            .spawn_on(JobLocation::Local, async move {
+            .spawn(JobLocation::Local, async move {
                 loop {
                     result1.fetch_add(1, Ordering::SeqCst);
                     yield_now().await;
@@ -2328,20 +2468,22 @@ mod tests {
     fn test_futures_panic() {
         let jobs = Jobs::default();
 
-        jobs.spawn_on(JobLocation::Local, async {
-            println!("About to panic...");
-            yield_now().await;
-            if true {
-                panic!("Intentional panic for testing");
-            }
-            yield_now().await;
-            42
-        })
-        .unwrap();
+        let job = jobs
+            .spawn(JobLocation::Local, async {
+                println!("About to panic...");
+                yield_now().await;
+                if true {
+                    panic!("Intentional panic for testing");
+                }
+                yield_now().await;
+                42
+            })
+            .unwrap();
 
         while !jobs.queue_is_empty() {
             jobs.run_local();
         }
+        assert_eq!(job.try_take(), None);
     }
 
     #[test]
