@@ -453,6 +453,63 @@ pub async fn spawn_closure<T: Send + 'static>(
     result
 }
 
+pub async fn run_queue(queue: &JobQueue) {
+    poll_fn(|cx| {
+        let waker = cx.waker();
+        if let Some(waker) = JobsWaker::try_cast(waker) {
+            waker.run_queue(queue);
+        }
+        waker.wake_by_ref();
+        Poll::Ready(())
+    })
+    .await
+}
+
+pub async fn run_queue_with_meta(
+    queue: &JobQueue,
+    worker_meta: impl IntoIterator<Item = (String, DynamicManagedLazy)>,
+) {
+    let mut worker_meta = Some(worker_meta);
+    poll_fn(move |cx| {
+        let waker = cx.waker();
+        if let Some(waker) = JobsWaker::try_cast(waker) {
+            waker.run_queue_with_meta(queue, worker_meta.take().unwrap());
+        }
+        waker.wake_by_ref();
+        Poll::Ready(())
+    })
+    .await
+}
+
+pub async fn run_queue_timeout(queue: &JobQueue, timeout: Duration) {
+    poll_fn(|cx| {
+        let waker = cx.waker();
+        if let Some(waker) = JobsWaker::try_cast(waker) {
+            waker.run_queue_timeout(queue, timeout);
+        }
+        waker.wake_by_ref();
+        Poll::Ready(())
+    })
+    .await
+}
+
+pub async fn run_queue_timeout_with_meta(
+    queue: &JobQueue,
+    timeout: Duration,
+    worker_meta: impl IntoIterator<Item = (String, DynamicManagedLazy)>,
+) {
+    let mut worker_meta = Some(worker_meta);
+    poll_fn(move |cx| {
+        let waker = cx.waker();
+        if let Some(waker) = JobsWaker::try_cast(waker) {
+            waker.run_queue_timeout_with_meta(queue, timeout, worker_meta.take().unwrap());
+        }
+        waker.wake_by_ref();
+        Poll::Ready(())
+    })
+    .await
+}
+
 /// IMPORTANT: You must assign the result of this function to a named variable,
 /// otherwise the future will be executed immediately!
 #[must_use]
