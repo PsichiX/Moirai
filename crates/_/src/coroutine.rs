@@ -15,8 +15,7 @@ use std::{
     hash::Hash,
     pin::Pin,
     sync::{Arc, Mutex, RwLock, atomic::Ordering, mpsc::Receiver},
-    task::{Context, Poll, Wake},
-    thread::Thread,
+    task::Poll,
 };
 use typid::ID;
 
@@ -37,27 +36,6 @@ impl Drop for OnExit {
 impl OnExit {
     pub fn invalidate(mut self) {
         self.job = None;
-    }
-}
-
-pub fn block_on<F: Future>(future: F) -> F::Output {
-    struct ThreadWaker(Thread);
-
-    impl Wake for ThreadWaker {
-        fn wake(self: Arc<Self>) {
-            self.0.unpark();
-        }
-    }
-
-    let mut future = Box::pin(future);
-    let t = std::thread::current();
-    let waker = Arc::new(ThreadWaker(t)).into();
-    let mut ctx = Context::from_waker(&waker);
-    loop {
-        match future.as_mut().poll(&mut ctx) {
-            Poll::Ready(output) => return output,
-            Poll::Pending => std::thread::park(),
-        }
     }
 }
 
@@ -414,6 +392,8 @@ pub async fn spawn<T: Send + 'static>(
                     meta: waker.local_meta(),
                     #[cfg(debug_assertions)]
                     creation_backtrace: creation_backtrace.clone(),
+                    #[cfg(feature = "tracing")]
+                    tracing_span: None,
                 });
             }
             waker.wake_by_ref();
@@ -427,7 +407,7 @@ pub async fn spawn<T: Send + 'static>(
     result
 }
 
-pub async fn queue<T: Send + 'static>(
+pub async fn spawn_closure<T: Send + 'static>(
     options: impl Into<JobOptions>,
     job: impl FnOnce(JobContext) -> T + Send + Sync + 'static,
 ) -> JobHandle<T> {
@@ -458,6 +438,8 @@ pub async fn queue<T: Send + 'static>(
                     meta: waker.local_meta(),
                     #[cfg(debug_assertions)]
                     creation_backtrace: creation_backtrace.clone(),
+                    #[cfg(feature = "tracing")]
+                    tracing_span: None,
                 });
             }
             waker.wake_by_ref();
@@ -497,6 +479,8 @@ pub async fn on_exit(future: impl Future<Output = ()> + Send + Sync + 'static) -
                         meta: waker.local_meta(),
                         #[cfg(debug_assertions)]
                         creation_backtrace: creation_backtrace.clone(),
+                        #[cfg(feature = "tracing")]
+                        tracing_span: None,
                     }),
                     queue: waker.queue(),
                 }
