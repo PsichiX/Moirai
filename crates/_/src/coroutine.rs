@@ -43,84 +43,6 @@ pub async fn yield_now() {
     wait_polls(1).await
 }
 
-pub async fn wait_polls(mut count: usize) {
-    poll_fn(move |cx| {
-        if count == 0 {
-            cx.waker().wake_by_ref();
-            Poll::Ready(())
-        } else {
-            count -= 1;
-            cx.waker().wake_by_ref();
-            Poll::Pending
-        }
-    })
-    .await
-}
-
-pub async fn wait_time(duration: Duration) -> Duration {
-    let timer = Instant::now();
-    poll_fn(move |cx| {
-        let elapsed = timer.elapsed();
-        if elapsed >= duration {
-            cx.waker().wake_by_ref();
-            Poll::Ready(elapsed - duration)
-        } else {
-            cx.waker().wake_by_ref();
-            Poll::Pending
-        }
-    })
-    .await
-}
-
-pub async fn wait_for_mutex<T>(notify: Arc<Mutex<T>>, mut f: impl FnMut(&T) -> bool) {
-    poll_fn(move |cx| {
-        if let Ok(value) = notify.try_lock() {
-            if f(&value) {
-                cx.waker().wake_by_ref();
-                Poll::Ready(())
-            } else {
-                cx.waker().wake_by_ref();
-                Poll::Pending
-            }
-        } else {
-            cx.waker().wake_by_ref();
-            Poll::Ready(())
-        }
-    })
-    .await
-}
-
-pub async fn wait_for_rwlock<T>(notify: Arc<RwLock<T>>, mut f: impl FnMut(&T) -> bool) {
-    poll_fn(move |cx| {
-        if let Ok(notify) = notify.try_read() {
-            if f(&notify) {
-                cx.waker().wake_by_ref();
-                Poll::Ready(())
-            } else {
-                cx.waker().wake_by_ref();
-                Poll::Pending
-            }
-        } else {
-            cx.waker().wake_by_ref();
-            Poll::Ready(())
-        }
-    })
-    .await
-}
-
-pub async fn wait_for_receiver<T>(notify: Receiver<T>) -> T {
-    poll_fn(move |cx| {
-        if let Ok(value) = notify.try_recv() {
-            cx.waker().wake_by_ref();
-            Poll::Ready(value)
-        } else {
-            cx.waker().wake_by_ref();
-            Poll::Pending
-        }
-    })
-    .await
-}
-
 pub async fn with_all<T>(
     mut futures: Vec<Pin<Box<dyn Future<Output = T> + Send + Sync>>>,
 ) -> Vec<T> {
@@ -285,40 +207,6 @@ pub async fn meta_dynamic(name: &str) -> Option<DynamicManagedLazy> {
         };
         waker.wake_by_ref();
         Poll::Ready(result)
-    })
-    .await
-}
-
-pub async fn wait_for_meta<T>(name: &str) -> ManagedLazy<T> {
-    poll_fn(move |cx| {
-        let waker = cx.waker();
-        let result = JobsWaker::try_cast(waker).and_then(|waker| {
-            waker
-                .get_meta(name)
-                .and_then(|lazy| lazy.into_typed::<T>().ok())
-        });
-        if let Some(result) = result {
-            cx.waker().wake_by_ref();
-            Poll::Ready(result)
-        } else {
-            cx.waker().wake_by_ref();
-            Poll::Pending
-        }
-    })
-    .await
-}
-
-pub async fn wait_for_meta_dynamic(name: &str) -> DynamicManagedLazy {
-    poll_fn(move |cx| {
-        let waker = cx.waker();
-        let result = JobsWaker::try_cast(waker).and_then(|waker| waker.get_meta(name));
-        if let Some(result) = result {
-            cx.waker().wake_by_ref();
-            Poll::Ready(result)
-        } else {
-            cx.waker().wake_by_ref();
-            Poll::Pending
-        }
     })
     .await
 }
@@ -576,5 +464,130 @@ pub async fn lifetime_bound<F: Future>(
         || states.iter().any(|state| state.upgrade().is_none()),
         future,
     )
+    .await
+}
+
+pub async fn wait_polls(mut count: usize) {
+    poll_fn(move |cx| {
+        if count == 0 {
+            cx.waker().wake_by_ref();
+            Poll::Ready(())
+        } else {
+            count -= 1;
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
+    })
+    .await
+}
+
+pub async fn wait_time(duration: Duration) -> Duration {
+    let timer = Instant::now();
+    poll_fn(move |cx| {
+        let elapsed = timer.elapsed();
+        if elapsed >= duration {
+            cx.waker().wake_by_ref();
+            Poll::Ready(elapsed - duration)
+        } else {
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
+    })
+    .await
+}
+
+pub async fn wait_for_mutex<T>(notify: Arc<Mutex<T>>, mut f: impl FnMut(&T) -> bool) {
+    poll_fn(move |cx| {
+        if let Ok(value) = notify.try_lock() {
+            if f(&value) {
+                cx.waker().wake_by_ref();
+                Poll::Ready(())
+            } else {
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            }
+        } else {
+            cx.waker().wake_by_ref();
+            Poll::Ready(())
+        }
+    })
+    .await
+}
+
+pub async fn wait_for_rwlock<T>(notify: Arc<RwLock<T>>, mut f: impl FnMut(&T) -> bool) {
+    poll_fn(move |cx| {
+        if let Ok(notify) = notify.try_read() {
+            if f(&notify) {
+                cx.waker().wake_by_ref();
+                Poll::Ready(())
+            } else {
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            }
+        } else {
+            cx.waker().wake_by_ref();
+            Poll::Ready(())
+        }
+    })
+    .await
+}
+
+pub async fn wait_for_receiver<T>(notify: Receiver<T>) -> T {
+    poll_fn(move |cx| {
+        if let Ok(value) = notify.try_recv() {
+            cx.waker().wake_by_ref();
+            Poll::Ready(value)
+        } else {
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
+    })
+    .await
+}
+
+pub async fn wait_for_meta<T>(name: &str) -> ManagedLazy<T> {
+    poll_fn(move |cx| {
+        let waker = cx.waker();
+        let result = JobsWaker::try_cast(waker).and_then(|waker| {
+            waker
+                .get_meta(name)
+                .and_then(|lazy| lazy.into_typed::<T>().ok())
+        });
+        if let Some(result) = result {
+            cx.waker().wake_by_ref();
+            Poll::Ready(result)
+        } else {
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
+    })
+    .await
+}
+
+pub async fn wait_for_meta_dynamic(name: &str) -> DynamicManagedLazy {
+    poll_fn(move |cx| {
+        let waker = cx.waker();
+        let result = JobsWaker::try_cast(waker).and_then(|waker| waker.get_meta(name));
+        if let Some(result) = result {
+            cx.waker().wake_by_ref();
+            Poll::Ready(result)
+        } else {
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
+    })
+    .await
+}
+
+pub async fn wait_for(condition: impl Fn() -> bool) {
+    poll_fn(move |cx| {
+        if condition() {
+            cx.waker().wake_by_ref();
+            Poll::Ready(())
+        } else {
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
+    })
     .await
 }

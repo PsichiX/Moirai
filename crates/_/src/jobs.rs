@@ -436,6 +436,66 @@ impl std::fmt::Display for JobPriority {
     }
 }
 
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub enum JobLocation {
+    #[default]
+    Unknown,
+    Local,
+    NonLocal,
+    UnnamedWorker,
+    NamedWorker(String),
+    ExactThread(ThreadId),
+    OtherThanThread(ThreadId),
+    Exclusive,
+}
+
+impl JobLocation {
+    pub fn named_worker(name: impl ToString) -> Self {
+        JobLocation::NamedWorker(name.to_string())
+    }
+
+    pub fn thread(thread: ThreadId) -> Self {
+        JobLocation::ExactThread(thread)
+    }
+
+    pub fn current_thread() -> Self {
+        JobLocation::ExactThread(std::thread::current().id())
+    }
+
+    pub fn other_than_current_thread() -> Self {
+        JobLocation::OtherThanThread(std::thread::current().id())
+    }
+}
+
+impl std::fmt::Display for JobLocation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            JobLocation::Unknown => write!(f, "Unknown"),
+            JobLocation::Local => write!(f, "Local"),
+            JobLocation::NonLocal => write!(f, "Non-local"),
+            JobLocation::UnnamedWorker => write!(f, "Unnamed worker"),
+            JobLocation::NamedWorker(name) => write!(f, "Named worker: {name}"),
+            JobLocation::ExactThread(id) => write!(f, "Exact thread: {id:?}"),
+            JobLocation::OtherThanThread(id) => write!(f, "Other than thread: {id:?}"),
+            JobLocation::Exclusive => write!(f, "Exclusive"),
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct JobToken {
+    hash_tokens: Arc<Mutex<HashSet<u64>>>,
+    hash: u64,
+}
+
+impl Drop for JobToken {
+    fn drop(&mut self) {
+        if let Ok(mut hash_tokens) = self.hash_tokens.lock() {
+            hash_tokens.remove(&self.hash);
+        }
+    }
+}
+
 pub(crate) struct JobObject {
     pub id: ID<Jobs>,
     pub job: Job,
@@ -574,6 +634,20 @@ impl JobQueue {
                     current_queue.push_back(object);
                 }
             }
+        }
+    }
+}
+
+impl Future for JobQueue {
+    type Output = ();
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        if self.is_empty() {
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        } else {
+            cx.waker().wake_by_ref();
+            Poll::Ready(())
         }
     }
 }
@@ -879,66 +953,6 @@ impl Worker {
 pub(crate) enum JobsWakerCommand {
     MoveTo(JobLocation),
     ChangePriority(JobPriority),
-}
-
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub enum JobLocation {
-    #[default]
-    Unknown,
-    Local,
-    NonLocal,
-    UnnamedWorker,
-    NamedWorker(String),
-    ExactThread(ThreadId),
-    OtherThanThread(ThreadId),
-    Exclusive,
-}
-
-impl JobLocation {
-    pub fn named_worker(name: impl ToString) -> Self {
-        JobLocation::NamedWorker(name.to_string())
-    }
-
-    pub fn thread(thread: ThreadId) -> Self {
-        JobLocation::ExactThread(thread)
-    }
-
-    pub fn current_thread() -> Self {
-        JobLocation::ExactThread(std::thread::current().id())
-    }
-
-    pub fn other_than_current_thread() -> Self {
-        JobLocation::OtherThanThread(std::thread::current().id())
-    }
-}
-
-impl std::fmt::Display for JobLocation {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            JobLocation::Unknown => write!(f, "Unknown"),
-            JobLocation::Local => write!(f, "Local"),
-            JobLocation::NonLocal => write!(f, "Non-local"),
-            JobLocation::UnnamedWorker => write!(f, "Unnamed worker"),
-            JobLocation::NamedWorker(name) => write!(f, "Named worker: {name}"),
-            JobLocation::ExactThread(id) => write!(f, "Exact thread: {id:?}"),
-            JobLocation::OtherThanThread(id) => write!(f, "Other than thread: {id:?}"),
-            JobLocation::Exclusive => write!(f, "Exclusive"),
-        }
-    }
-}
-
-#[derive(Default)]
-pub struct JobToken {
-    hash_tokens: Arc<Mutex<HashSet<u64>>>,
-    hash: u64,
-}
-
-impl Drop for JobToken {
-    fn drop(&mut self) {
-        if let Ok(mut hash_tokens) = self.hash_tokens.lock() {
-            hash_tokens.remove(&self.hash);
-        }
-    }
 }
 
 pub(crate) struct JobsWaker {
@@ -1767,6 +1781,13 @@ impl Jobs {
         cvar.notify_all();
         Ok(handle)
     }
+
+    pub fn scope<'env, T: Send + 'static, R>(
+        &'env self,
+        f: impl FnOnce(&mut ScopedJobs<'env, T>) -> R + 'env,
+    ) -> (Vec<T>, R) {
+        ScopedJobs::execute(self, f)
+    }
 }
 
 pub struct ScopedJobs<'env, T: Send + 'static> {
@@ -1774,21 +1795,22 @@ pub struct ScopedJobs<'env, T: Send + 'static> {
     handles: AllJobsHandle<T>,
 }
 
-impl<T: Send + 'static> Drop for ScopedJobs<'_, T> {
-    fn drop(&mut self) {
-        for handle in self.handles.iter() {
-            handle.cancel();
-        }
-        self.execute_inner();
-    }
-}
-
 impl<'env, T: Send + 'static> ScopedJobs<'env, T> {
-    pub fn new(jobs: &'env Jobs) -> Self {
-        Self {
+    pub fn scope<'env2: 'env, T2: Send + 'static, R>(
+        &'env2 self,
+        f: impl FnOnce(&mut ScopedJobs<'env2, T2>) -> R + 'env2,
+    ) -> (Vec<T2>, R) {
+        ScopedJobs::<T2>::execute::<R>(self.jobs, f)
+    }
+
+    pub fn execute<R>(jobs: &'env Jobs, f: impl FnOnce(&mut Self) -> R + 'env) -> (Vec<T>, R) {
+        let mut scope = Self {
             jobs,
-            handles: Default::default(),
-        }
+            handles: AllJobsHandle::default(),
+        };
+        let result = f(&mut scope);
+        let output = scope.handles.wait().unwrap_or_default();
+        (output, result)
     }
 
     pub fn spawn(
@@ -1850,14 +1872,6 @@ impl<'env, T: Send + 'static> ScopedJobs<'env, T> {
         self.handles
             .extend(self.jobs.broadcast_n(work_groups, job)?.into_inner());
         Ok(())
-    }
-
-    pub fn execute(mut self) -> Vec<T> {
-        self.execute_inner()
-    }
-
-    fn execute_inner(&mut self) -> Vec<T> {
-        std::mem::take(&mut self.handles).wait().unwrap_or_default()
     }
 }
 
@@ -2033,18 +2047,22 @@ mod tests {
         let jobs = Jobs::default();
         let mut data = (0..100).collect::<Vec<_>>();
 
-        let mut scope = ScopedJobs::new(&jobs);
-        scope
-            .spawn_closure(JobLocation::NonLocal, |_| {
-                for value in &mut data {
-                    *value *= 2;
-                }
-                data.iter().copied().sum::<usize>()
+        let output = jobs
+            .scope(|scope| {
+                scope
+                    .spawn_closure(JobLocation::NonLocal, |_| {
+                        for value in &mut data {
+                            *value *= 2;
+                        }
+                        data.iter().copied().sum::<usize>()
+                    })
+                    .unwrap();
             })
-            .unwrap();
+            .0
+            .into_iter()
+            .sum::<usize>();
 
-        let result = scope.execute().into_iter().sum::<usize>();
-        assert_eq!(result, 9900);
+        assert_eq!(output, 9900);
     }
 
     #[test]
