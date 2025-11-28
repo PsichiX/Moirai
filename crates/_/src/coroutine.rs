@@ -441,15 +441,26 @@ pub async fn on_exit(future: impl Future<Output = ()> + Send + Sync + 'static) -
     .await
 }
 
-pub async fn cancellable<F: Future>(condition: impl Fn() -> bool, future: F) -> Option<F::Output> {
+pub async fn cancellable<F: Future>(
+    mut condition: impl FnMut() -> bool,
+    future: F,
+) -> Option<F::Output> {
     let mut future = Box::pin(future);
     poll_fn(move |cx| {
         if condition() {
             cx.waker().wake_by_ref();
             Poll::Ready(None)
         } else {
-            cx.waker().wake_by_ref();
-            future.as_mut().poll(cx).map(Some)
+            match future.as_mut().poll(cx) {
+                Poll::Ready(output) => {
+                    cx.waker().wake_by_ref();
+                    Poll::Ready(Some(output))
+                }
+                Poll::Pending => {
+                    cx.waker().wake_by_ref();
+                    Poll::Pending
+                }
+            }
         }
     })
     .await
@@ -465,6 +476,11 @@ pub async fn lifetime_bound<F: Future>(
         future,
     )
     .await
+}
+
+pub async fn duration_bound<F: Future>(duration: Duration, future: F) -> Option<F::Output> {
+    let start = Instant::now();
+    cancellable(move || start.elapsed() >= duration, future).await
 }
 
 pub async fn wait_polls(mut count: usize) {
@@ -589,5 +605,93 @@ pub async fn wait_for(condition: impl Fn() -> bool) {
             Poll::Pending
         }
     })
+    .await
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct StrategyDecision {
+    pub change_location: Option<JobLocation>,
+    pub change_priority: Option<JobPriority>,
+    pub cancel: bool,
+}
+
+impl StrategyDecision {
+    pub fn location(mut self, location: JobLocation) -> Self {
+        self.change_location = Some(location);
+        self
+    }
+
+    pub fn priority(mut self, priority: JobPriority) -> Self {
+        self.change_priority = Some(priority);
+        self
+    }
+
+    pub fn cancel(mut self) -> Self {
+        self.cancel = true;
+        self
+    }
+}
+
+pub async fn strategy<F: Future>(
+    mut strategy: impl FnMut() -> StrategyDecision,
+    future: F,
+) -> Option<F::Output> {
+    let mut future = Box::pin(future);
+    poll_fn(move |cx| match future.as_mut().poll(cx) {
+        Poll::Ready(output) => {
+            cx.waker().wake_by_ref();
+            Poll::Ready(Some(output))
+        }
+        Poll::Pending => {
+            let waker = cx.waker();
+            let StrategyDecision {
+                change_location,
+                change_priority,
+                cancel,
+            } = strategy();
+            if cancel {
+                cx.waker().wake_by_ref();
+                return Poll::Ready(None);
+            }
+            if (change_location.is_some() || change_priority.is_some())
+                && let Some(waker) = JobsWaker::try_cast(waker)
+            {
+                if let Some(location) = change_location {
+                    waker.command(JobsWakerCommand::MoveTo(location.clone()));
+                }
+                if let Some(priority) = change_priority {
+                    waker.command(JobsWakerCommand::ChangePriority(priority));
+                }
+            }
+            waker.wake_by_ref();
+            Poll::Pending
+        }
+    })
+    .await
+}
+
+pub async fn strategy_timeline<F: Future>(
+    timeline: impl IntoIterator<Item = (Duration, StrategyDecision)>,
+    future: F,
+) -> Option<F::Output> {
+    let mut timer = Instant::now();
+    let mut timeline = timeline.into_iter();
+    let mut next = timeline.next();
+    strategy(
+        move || {
+            if let Some((timeout, decision)) = next.clone() {
+                if timer.elapsed() >= timeout {
+                    next = timeline.next();
+                    timer = Instant::now();
+                    decision
+                } else {
+                    Default::default()
+                }
+            } else {
+                Default::default()
+            }
+        },
+        future,
+    )
     .await
 }
