@@ -436,7 +436,7 @@ impl std::fmt::Display for JobPriority {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub enum JobLocation {
     #[default]
     Unknown,
@@ -447,6 +447,7 @@ pub enum JobLocation {
     ExactThread(ThreadId),
     OtherThanThread(ThreadId),
     Exclusive,
+    Queue(JobQueue),
 }
 
 impl JobLocation {
@@ -478,6 +479,7 @@ impl std::fmt::Display for JobLocation {
             JobLocation::ExactThread(id) => write!(f, "Exact thread: {id:?}"),
             JobLocation::OtherThanThread(id) => write!(f, "Other than thread: {id:?}"),
             JobLocation::Exclusive => write!(f, "Exclusive"),
+            JobLocation::Queue(_) => write!(f, "Job queue"),
         }
     }
 }
@@ -617,6 +619,7 @@ impl JobQueue {
                     (JobLocation::ExactThread(a), _) => *a == std::thread::current().id(),
                     (JobLocation::OtherThanThread(a), _) => *a != std::thread::current().id(),
                     (JobLocation::NonLocal, b) => b != &JobLocation::Local,
+                    (JobLocation::Queue(q), _) => q == self,
                     (JobLocation::Unknown, _) => true,
                     _ => false,
                 }
@@ -649,6 +652,20 @@ impl Future for JobQueue {
             cx.waker().wake_by_ref();
             Poll::Ready(())
         }
+    }
+}
+
+impl PartialEq for JobQueue {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.queue, &other.queue)
+    }
+}
+
+impl std::fmt::Debug for JobQueue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("JobQueue")
+            .field("len", &self.len())
+            .finish()
     }
 }
 
@@ -760,8 +777,24 @@ impl Worker {
                                 }
                             }
                         }
-                        if let Some(location) = move_to {
-                            pending.push(JobObject {
+                        match move_to {
+                            Some(JobLocation::Queue(q)) => {
+                                q.enqueue(JobObject {
+                                    id,
+                                    job,
+                                    context,
+                                    location,
+                                    priority,
+                                    cancel,
+                                    suspend,
+                                    meta,
+                                    #[cfg(debug_assertions)]
+                                    creation_backtrace,
+                                    #[cfg(feature = "tracing")]
+                                    tracing_span,
+                                });
+                            }
+                            Some(location) => pending.push(JobObject {
                                 id,
                                 job,
                                 context,
@@ -774,9 +807,8 @@ impl Worker {
                                 creation_backtrace,
                                 #[cfg(feature = "tracing")]
                                 tracing_span,
-                            });
-                        } else {
-                            pending.push(JobObject {
+                            }),
+                            None => pending.push(JobObject {
                                 id,
                                 job,
                                 context,
@@ -789,7 +821,7 @@ impl Worker {
                                 creation_backtrace,
                                 #[cfg(feature = "tracing")]
                                 tracing_span,
-                            });
+                            }),
                         }
                     }
                     if terminate2.load(Ordering::Relaxed) {
@@ -913,36 +945,55 @@ impl Worker {
                             }
                         }
                     }
-                    if let Some(location) = move_to {
-                        queue.enqueue(JobObject {
-                            id,
-                            job,
-                            context,
-                            location,
-                            priority,
-                            cancel,
-                            suspend,
-                            meta,
-                            #[cfg(debug_assertions)]
-                            creation_backtrace,
-                            #[cfg(feature = "tracing")]
-                            tracing_span,
-                        });
-                    } else {
-                        pending = Some(JobObject {
-                            id,
-                            job,
-                            context,
-                            location,
-                            priority,
-                            cancel,
-                            suspend,
-                            meta,
-                            #[cfg(debug_assertions)]
-                            creation_backtrace,
-                            #[cfg(feature = "tracing")]
-                            tracing_span,
-                        });
+                    match move_to {
+                        Some(JobLocation::Queue(q)) => {
+                            q.enqueue(JobObject {
+                                id,
+                                job,
+                                context,
+                                location,
+                                priority,
+                                cancel,
+                                suspend,
+                                meta,
+                                #[cfg(debug_assertions)]
+                                creation_backtrace,
+                                #[cfg(feature = "tracing")]
+                                tracing_span,
+                            });
+                        }
+                        Some(location) => {
+                            queue.enqueue(JobObject {
+                                id,
+                                job,
+                                context,
+                                location,
+                                priority,
+                                cancel,
+                                suspend,
+                                meta,
+                                #[cfg(debug_assertions)]
+                                creation_backtrace,
+                                #[cfg(feature = "tracing")]
+                                tracing_span,
+                            });
+                        }
+                        None => {
+                            pending = Some(JobObject {
+                                id,
+                                job,
+                                context,
+                                location,
+                                priority,
+                                cancel,
+                                suspend,
+                                meta,
+                                #[cfg(debug_assertions)]
+                                creation_backtrace,
+                                #[cfg(feature = "tracing")]
+                                tracing_span,
+                            });
+                        }
                     }
                 }
             }
@@ -1608,8 +1659,24 @@ impl Jobs {
                         }
                     }
                 }
-                if let Some(location) = move_to {
-                    pending.push(JobObject {
+                match move_to {
+                    Some(JobLocation::Queue(q)) => {
+                        q.enqueue(JobObject {
+                            id,
+                            job,
+                            context,
+                            location,
+                            priority,
+                            cancel,
+                            suspend,
+                            meta,
+                            #[cfg(debug_assertions)]
+                            creation_backtrace,
+                            #[cfg(feature = "tracing")]
+                            tracing_span,
+                        });
+                    }
+                    Some(location) => pending.push(JobObject {
                         id,
                         job,
                         context,
@@ -1622,9 +1689,8 @@ impl Jobs {
                         creation_backtrace,
                         #[cfg(feature = "tracing")]
                         tracing_span,
-                    });
-                } else {
-                    pending.push(JobObject {
+                    }),
+                    None => pending.push(JobObject {
                         id,
                         job,
                         context,
@@ -1637,7 +1703,7 @@ impl Jobs {
                         creation_backtrace,
                         #[cfg(feature = "tracing")]
                         tracing_span,
-                    });
+                    }),
                 }
             }
             if notify_workers {
