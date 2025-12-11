@@ -8,8 +8,7 @@ fn main() {
     // instead panic is logged using `tracing`.
     jobs.spawn((), async {
         panic!("This job panics!");
-    })
-    .unwrap();
+    });
 
     // Just waiting for the job to be processed.
     while !jobs.queue_is_empty() {}

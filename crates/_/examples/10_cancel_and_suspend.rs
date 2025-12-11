@@ -8,15 +8,13 @@ fn main() {
     let jobs = Jobs::default();
 
     // Spawn a job that suspends itself and when resumed, it waits to yield a result.
-    let job = jobs
-        .spawn((), async {
-            println!("Suspending job...");
-            suspend().await;
-            println!("Job resumed!");
-            wait_time(Duration::from_millis(500)).await;
-            42
-        })
-        .unwrap();
+    let job = jobs.spawn((), async {
+        println!("Suspending job...");
+        suspend().await;
+        println!("Job resumed!");
+        wait_time(Duration::from_millis(500)).await;
+        42
+    });
 
     println!("Waiting 500 milliseconds before resuming...");
     std::thread::sleep(Duration::from_millis(500));

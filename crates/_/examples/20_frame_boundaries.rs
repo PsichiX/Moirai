@@ -28,16 +28,14 @@ fn main() {
     jobs.set_meta(NEXT_FRAME_QUEUE, next_frame_queue.lazy().into_dynamic());
 
     // Start job on the local worker.
-    let job = jobs
-        .spawn(JobLocation::Local, async {
-            println!("Before");
+    let job = jobs.spawn(JobLocation::Local, async {
+        println!("Before");
 
-            // Wait till the next frame.
-            wait_for_next_frame().await;
+        // Wait till the next frame.
+        wait_for_next_frame().await;
 
-            println!("After");
-        })
-        .unwrap();
+        println!("After");
+    });
 
     // Emulate frame rate timer.
     let mut timer = Instant::now();
@@ -61,7 +59,7 @@ fn main() {
         // If you run local queue once per frame, jobs on hitting pending would
         // never get chance to run again in the same frame, which we care about
         // when we need to progress jobs until next frame hits.
-        while !jobs.queue_is_empty() {
+        while jobs.queue_filter_count(|_, location, _, _, _| *location == JobLocation::Local) > 0 {
             // We need to update timeout based on elapsed time to keep frame
             // rate stable. If we run local queue without timeout, jobs might
             // consume more time that frame budget allows. Or worse, if no next

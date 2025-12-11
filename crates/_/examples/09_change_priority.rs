@@ -10,22 +10,19 @@ fn main() {
         println!("Job A running with normal priority.");
         yield_now().await;
         println!("Job A continuing on normal priority.");
-    })
-    .unwrap();
+    });
 
     jobs.spawn(JobLocation::Local, async {
         println!("Job B running with normal priority.");
         yield_now().await;
         println!("Job B continuing on normal priority.");
-    })
-    .unwrap();
+    });
 
     jobs.spawn(JobLocation::Local, async {
         println!("Job C changing its priority to high. Executes last.");
         change_priority(JobPriority::High).await;
         println!("Job C continuing on high priority. Executes first.");
-    })
-    .unwrap();
+    });
 
     // We spawned local jobs to better show deterministic execution order.
     // In case of threaded jobs, the order may vary due to jobs stealing,

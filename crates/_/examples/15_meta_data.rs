@@ -15,7 +15,6 @@ fn main() {
             let value = meta::<usize>("value").await.unwrap();
             *value.read().unwrap()
         })
-        .unwrap()
         .wait()
         .unwrap();
 

@@ -22,6 +22,5 @@ fn main() {
         .await
         .wait();
     })
-    .unwrap()
     .wait();
 }

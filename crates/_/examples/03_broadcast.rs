@@ -21,7 +21,6 @@ fn main() {
             );
             sum
         })
-        .unwrap()
         .wait()
         .into_iter()
         .flatten()
@@ -42,7 +41,6 @@ fn main() {
             );
             sum
         })
-        .unwrap()
         .wait()
         .into_iter()
         .flatten()

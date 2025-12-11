@@ -9,16 +9,14 @@ fn main() {
     let queue2 = queue.clone();
 
     // Start job on the local worker.
-    let job = jobs
-        .spawn(JobLocation::Local, async move {
-            println!("Job running on local worker");
+    let job = jobs.spawn(JobLocation::Local, async move {
+        println!("Job running on local worker");
 
-            // Move to dedicated queue.
-            move_to(JobLocation::Queue(queue2)).await;
+        // Move to dedicated queue.
+        move_to(JobLocation::Queue(queue2)).await;
 
-            println!("Job running on dedicated queue");
-        })
-        .unwrap();
+        println!("Job running on dedicated queue");
+    });
 
     // First run local jobs.
     println!("Running local jobs");

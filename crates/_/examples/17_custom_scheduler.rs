@@ -40,8 +40,7 @@ fn main() {
                 run_queue(&ai_queue2).await;
             }
         }),
-    )
-    .unwrap();
+    );
 
     jobs.spawn(
         JobLocation::Exclusive,
@@ -51,8 +50,7 @@ fn main() {
                 run_queue(&physics_queue2).await;
             }
         }),
-    )
-    .unwrap();
+    );
 
     // Spawn jobs in the custom job queues.
     let ai_job = ai_queue.spawn((), async {

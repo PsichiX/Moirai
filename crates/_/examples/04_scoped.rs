@@ -11,13 +11,11 @@ fn main() {
     // a tuple: `(Vec<Output>, Result)`.
     let output = jobs
         .scope(|scope| {
-            scope.spawn((), async { data[0] }).unwrap();
+            scope.spawn((), async { data[0] });
 
-            scope.spawn_closure((), |_| data[1]).unwrap();
+            scope.spawn_closure((), |_| data[1]);
 
-            scope
-                .broadcast_n(3, |ctx| data[2 + ctx.work_group_index])
-                .unwrap();
+            scope.broadcast_n(3, |ctx| data[2 + ctx.work_group_index]);
         })
         .0
         .into_iter()

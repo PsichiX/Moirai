@@ -7,16 +7,14 @@ fn main() {
     let jobs = Jobs::default();
 
     // Spawn a job on the local worker.
-    let job = jobs
-        .spawn(JobLocation::Local, async {
-            let mut counter = 0;
-            for _ in 0..10 {
-                counter += 1;
-                yield_now().await;
-            }
-            counter
-        })
-        .unwrap();
+    let job = jobs.spawn(JobLocation::Local, async {
+        let mut counter = 0;
+        for _ in 0..10 {
+            counter += 1;
+            yield_now().await;
+        }
+        counter
+    });
 
     while !jobs.queue_is_empty() {
         // Run jobs on the local worker. This step is needed in order to process

@@ -20,9 +20,8 @@ fn main() {
 
         // We can also invalidate exit work if we don't want it to run,
         // for example, if the job finished successfully and no cleanup is needed.
-        _exit.invalidate();
+        // _exit.invalidate();
     })
-    .unwrap()
     .wait();
 
     while !jobs.queue_is_empty() {}

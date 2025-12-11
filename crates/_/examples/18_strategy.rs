@@ -44,9 +44,7 @@ fn main() {
         }
     };
 
-    let job = jobs
-        .spawn(JobLocation::Local, strategy_timeline(timeline, task))
-        .unwrap();
+    let job = jobs.spawn(JobLocation::Local, strategy_timeline(timeline, task));
 
     while !jobs.queue_is_empty() {
         jobs.run_local();

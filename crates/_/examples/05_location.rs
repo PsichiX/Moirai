@@ -2,10 +2,11 @@ use moirai::{
     coroutine::yield_now,
     jobs::{JobLocation, Jobs},
 };
+use std::time::Duration;
 
 fn main() {
     // Create a Jobs runtime with a named worker "foo".
-    let jobs = Jobs::default().with_named_worker("foo");
+    let jobs = Jobs::default().with_named_worker(Duration::from_millis(1), "foo");
 
     // Spawn a job on an unnamed worker.
     jobs.spawn(JobLocation::UnnamedWorker, async {
@@ -16,7 +17,6 @@ fn main() {
         }
         counter
     })
-    .unwrap()
     .wait()
     .unwrap();
 
@@ -29,7 +29,6 @@ fn main() {
         }
         counter
     })
-    .unwrap()
     .wait()
     .unwrap();
 
@@ -42,7 +41,6 @@ fn main() {
         }
         counter
     })
-    .unwrap()
     .wait()
     .unwrap();
 
@@ -58,7 +56,6 @@ fn main() {
         }
         counter
     })
-    .unwrap()
     .wait()
     .unwrap();
 }
