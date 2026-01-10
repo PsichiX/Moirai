@@ -35,7 +35,7 @@
             const path_to_root = "../";
             const default_light_theme = "ayu";
             const default_dark_theme = "ayu";
-            window.path_to_searchindex_js = "../searchindex-10e9eeba.js";
+            window.path_to_searchindex_js = "../searchindex-9a7fb58d.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-ced68be6.js"></script>
@@ -597,6 +597,8 @@
 <p>What makes it ugly is that <code>this.write().unwrap()</code> accessor, which is needed for accessing data that’s essentially smart pointers, in order to make async compilation happy about lifetime of objects and their mutability (more about it in later chapters).</p>
 <blockquote>
 <p>Honestly, this is my personal grudge towards async in Rust, that you will need to use smart pointers, accessed especially like that, because if you operate on shared state instead of moving data in and out of future, you would want to access said data also outside of coroutine in per-frame game systems. So no prospect for win here.</p>
+<p>This is not a problem of async itself, but comes from requirements of multithreaded async runtimes, so in the end when you <em>need</em> shared state (instead of sending it around), you <em>need</em> smart pointers, and therefore your code ends up usually uglier.</p>
+<p>This doesn’t happen when you use singlethreded runtimes, but that has less coverage on average, so..</p>
 </blockquote>
 <p>The only redeeming value here is that this seeming uglyness is hidden from the user most of the times, as user mostly just calls this function in a timeline, not necessarily needing to dive into its code to figure out the state flow, as states flow is directed at the caller location, not in the function.</p>
 <h3 id="debugging-is-hard"><a class="header" href="#debugging-is-hard">Debugging is <strong><em>HARD</em></strong></a></h3>
@@ -977,7 +979,7 @@
 <p>There is no state exclusive to this coroutine that needs to be serialized, as it operates purely on game characters that will be serialized by game.</p>
 <p>The only thing we would like to serialize here would be a point between which states enemy is in its fight pattern.</p>
 <blockquote>
-<p>Although games usually save game at safe checkpoints, outside of battles, because that’s another category of problems in general, wether we do sync or async game logic.</p>
+<p>Although games usually save game at safe checkpoints, outside of battles, because that’s another category of problems in general, whether we do sync or async game logic.</p>
 </blockquote>
 <h2 id="where-coroutines-do-belong"><a class="header" href="#where-coroutines-do-belong">Where coroutines <strong>do</strong> belong</a></h2>
 <p>Coroutines have small, but rather useful set of scenarios to be used in, replacing manual state machines with automatic ones there.</p>
@@ -999,11 +1001,11 @@
 </li>
 <li>
 <p><em>Sometimes</em> <strong>AI action patterns</strong></p>
-<p>Where user should be able to learn them in order to anticipate NPC’s next move for advantage. It gets less useful the more AI is asset-driven, then coroutines might end up actually worsening the readability, but YMMV.</p>
+<p>Where player should be able to learn them in order to anticipate NPC’s next move for advantage. It gets less useful the more AI is asset-driven, then coroutines might end up actually worsening the readability, but YMMV.</p>
 </li>
 <li>
 <p><em>Sometimes</em> <strong>Quests</strong></p>
-<p>Where player is expected to do concrete actions, and/or specific game events should happen. But just like with AI action patterns, this also makes less coroutines less useful the more asset-driven quests system is.</p>
+<p>Where player is expected to do concrete actions, and/or specific game events should happen. But just like with AI action patterns, this also makes coroutines less useful the more asset-driven quests system is.</p>
 </li>
 <li>
 <p><strong>Scripted behaviors</strong></p>

@@ -35,7 +35,7 @@
             const path_to_root = "../../";
             const default_light_theme = "ayu";
             const default_dark_theme = "ayu";
-            window.path_to_searchindex_js = "../../searchindex-10e9eeba.js";
+            window.path_to_searchindex_js = "../../searchindex-9a7fb58d.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../../toc-ced68be6.js"></script>
@@ -804,12 +804,12 @@
 </span><span class="boring">
 </span><span class="boring">    yield_now().await;
 </span><span class="boring">}</span></code></pre>
-<p>There are two things interesting us:</p>
+<p>There are two things interesting to us:</p>
 <ul>
 <li><code>wait_for_key()</code></li>
 <li><code>selected_action()</code></li>
 </ul>
-<p>Waiting for turn requires us to check for events if there is a specific key pressed event.</p>
+<p>Waiting for key requires us to check for events if there is a specific key pressed event.</p>
 <pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">use crossterm::{
 </span><span class="boring">    event::{Event, KeyCode},
 </span><span class="boring">    style::Stylize,

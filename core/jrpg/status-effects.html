@@ -35,7 +35,7 @@
             const path_to_root = "../../";
             const default_light_theme = "ayu";
             const default_dark_theme = "ayu";
-            window.path_to_searchindex_js = "../../searchindex-10e9eeba.js";
+            window.path_to_searchindex_js = "../../searchindex-9a7fb58d.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../../toc-ced68be6.js"></script>
@@ -806,7 +806,7 @@
 <p>If we have enough mana for given spell cost, we spawn new job that will run in the background.</p>
 <blockquote>
 <p>Spawning jobs enables concurrency - an <strong>ability to run multiple jobs at the same time</strong>.</p>
-<p>If you come from Unity (coroutines) or JavaScript (timeouts/intervals/animation-frame-requests), or you just used threads before to achieve background work, you might have been using similar pattern already!</p>
+<p>If you come from Unity (coroutines) or JavaScript (timers/async-await), or you just used threads before to achieve background work, you might have been using similar pattern already!</p>
 </blockquote>
 <p>Spawned fire spell itself does nothing at the time of casting it (except deducing mana), but the spawned fire effect job will do its work each turn.</p>
 <pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">use crossterm::{
@@ -1436,7 +1436,7 @@
 </span><span class="boring">
 </span><span class="boring">    yield_now().await;
 </span><span class="boring">}</span></code></pre>
-<p>Quite simpler to understand than explicit state machines signalled with events, don’t you think? Maintanance and expanding of such logic is also quite easy to perform, as there isn’t much of moving parts scattered around that need careful focus to connect.</p>
+<p>Quite simpler to understand than explicit state machines signalled with events, don’t you think? Maintanance and expanding of such logic is also quite easy to perform, as there isn’t much of moving parts scattered around that need careful focus to connect the dots.</p>
 
                     </main>
 

@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "ayu";
             const default_dark_theme = "ayu";
-            window.path_to_searchindex_js = "searchindex-10e9eeba.js";
+            window.path_to_searchindex_js = "searchindex-9a7fb58d.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-ced68be6.js"></script>
@@ -2675,7 +2675,7 @@
 <h2 id="action-timelines-coroutines"><a class="header" href="#action-timelines-coroutines">Action timelines (Coroutines)</a></h2>
 <p>Action timelines, or coroutines as game developers tends to call them, are used to describe async logic flow in more sequential (to be more precise: procedural) way, reducing suspension and continuation boundary to single place (<code>.await</code>), instead of traditional reactive, scattered and manual state machine management.</p>
 <blockquote>
-<p>It’s worth noting that neighter of those is better than the other - they both express same end goal, but in different ways,  and we shouldn’t feel guilty for using one over another.</p>
+<p>It’s worth noting that neihter of those is better than the other - they both express same end goal, but in different ways,  and we shouldn’t feel guilty for using one over another.</p>
 </blockquote>
 <p>Coroutines allow constructing such state machines in more procedural way in code, automatically, as suspension and continuation is a first class concept in async, which covers perfectly the declaration and execution part of work that’s spread across time, but not across codebase - a state machine that we don’t need to handle manually, built for us by the compiler from single code block.</p>
 <h2 id="automatic-state-machines"><a class="header" href="#automatic-state-machines">Automatic state machines</a></h2>
@@ -3597,6 +3597,8 @@
 <p>What makes it ugly is that <code>this.write().unwrap()</code> accessor, which is needed for accessing data that’s essentially smart pointers, in order to make async compilation happy about lifetime of objects and their mutability (more about it in later chapters).</p>
 <blockquote>
 <p>Honestly, this is my personal grudge towards async in Rust, that you will need to use smart pointers, accessed especially like that, because if you operate on shared state instead of moving data in and out of future, you would want to access said data also outside of coroutine in per-frame game systems. So no prospect for win here.</p>
+<p>This is not a problem of async itself, but comes from requirements of multithreaded async runtimes, so in the end when you <em>need</em> shared state (instead of sending it around), you <em>need</em> smart pointers, and therefore your code ends up usually uglier.</p>
+<p>This doesn’t happen when you use singlethreded runtimes, but that has less coverage on average, so..</p>
 </blockquote>
 <p>The only redeeming value here is that this seeming uglyness is hidden from the user most of the times, as user mostly just calls this function in a timeline, not necessarily needing to dive into its code to figure out the state flow, as states flow is directed at the caller location, not in the function.</p>
 <h3 id="debugging-is-hard"><a class="header" href="#debugging-is-hard">Debugging is <strong><em>HARD</em></strong></a></h3>
@@ -3977,7 +3979,7 @@
 <p>There is no state exclusive to this coroutine that needs to be serialized, as it operates purely on game characters that will be serialized by game.</p>
 <p>The only thing we would like to serialize here would be a point between which states enemy is in its fight pattern.</p>
 <blockquote>
-<p>Although games usually save game at safe checkpoints, outside of battles, because that’s another category of problems in general, wether we do sync or async game logic.</p>
+<p>Although games usually save game at safe checkpoints, outside of battles, because that’s another category of problems in general, whether we do sync or async game logic.</p>
 </blockquote>
 <h2 id="where-coroutines-do-belong"><a class="header" href="#where-coroutines-do-belong">Where coroutines <strong>do</strong> belong</a></h2>
 <p>Coroutines have small, but rather useful set of scenarios to be used in, replacing manual state machines with automatic ones there.</p>
@@ -3999,11 +4001,11 @@
 </li>
 <li>
 <p><em>Sometimes</em> <strong>AI action patterns</strong></p>
-<p>Where user should be able to learn them in order to anticipate NPC’s next move for advantage. It gets less useful the more AI is asset-driven, then coroutines might end up actually worsening the readability, but YMMV.</p>
+<p>Where player should be able to learn them in order to anticipate NPC’s next move for advantage. It gets less useful the more AI is asset-driven, then coroutines might end up actually worsening the readability, but YMMV.</p>
 </li>
 <li>
 <p><em>Sometimes</em> <strong>Quests</strong></p>
-<p>Where player is expected to do concrete actions, and/or specific game events should happen. But just like with AI action patterns, this also makes less coroutines less useful the more asset-driven quests system is.</p>
+<p>Where player is expected to do concrete actions, and/or specific game events should happen. But just like with AI action patterns, this also makes coroutines less useful the more asset-driven quests system is.</p>
 </li>
 <li>
 <p><strong>Scripted behaviors</strong></p>
@@ -6064,7 +6066,7 @@
 </span><span class="boring">    yield_now().await;
 </span><span class="boring">}</span></code></pre>
 <blockquote>
-<p>Quick note: <code>AsyncShared&lt;T&gt;</code> is equivalent with <code>Arc&lt;RwLock&lt;T&gt;&gt;</code> in there to remove a bit of boilerplate. When using async runtimes to run async functions, those that are multithreaded, like Moirai or Tokio, they require data used in there to be <code>Send</code> and sometimes also <code>Sync</code> to make multithreading work.</p>
+<p>Quick note: <code>AsyncShared&lt;T&gt;</code> is equivalent with <code>Arc&lt;RwLock&lt;T&gt;&gt;</code> in there to remove a bit of boilerplate. When using async runtimes to run async functions, those that are multithreaded, like Moirai or Tokio, they require data used in there to be <code>Send</code> and sometimes also <code>Sync</code> to make multithreading work. Of course runtimes can have primitives to run thread-local futures, in that case you can use references to data, but general use is rather multithreaded runtimes.</p>
 </blockquote>
 <p>As you can see in the example, we have easily been able to express entire game loop as simple long-living coroutine.</p>
 <p>Now, let’s also take a look at one of the other coroutines we are calling in there, a player turn for example (as it will come handy for next chapter):</p>
@@ -6695,7 +6697,7 @@
 </span><span class="boring">
 </span><span class="boring">    yield_now().await;
 </span><span class="boring">}</span></code></pre>
-<p>You might be thinking right now, how that compares to traditional game state machine where each step of this is a separate state that handles its suspension and progression to other steps - you might remind yourself how boilerplate-y expressing stuff like that is. And yet with async we have got same behavior, without constructing such state machine ourselves. And we have got it autimated, just by having each step as an awaiting future.</p>
+<p>You might be thinking right now, how that compares to traditional game state machine where each step of this is a separate state that handles its suspension and progression to other steps - you might remind yourself how boilerplate-y expressing stuff like that is. And yet with async we have got same behavior, without constructing such state machine ourselves. And we have got it automated, just by having each step as an awaiting future.</p>
 <p>I would call it a quite big win, to be honest!</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="status-effects"><a class="header" href="#status-effects">Status effects</a></h1>
@@ -7330,7 +7332,7 @@
 <p>If we have enough mana for given spell cost, we spawn new job that will run in the background.</p>
 <blockquote>
 <p>Spawning jobs enables concurrency - an <strong>ability to run multiple jobs at the same time</strong>.</p>
-<p>If you come from Unity (coroutines) or JavaScript (timeouts/intervals/animation-frame-requests), or you just used threads before to achieve background work, you might have been using similar pattern already!</p>
+<p>If you come from Unity (coroutines) or JavaScript (timers/async-await), or you just used threads before to achieve background work, you might have been using similar pattern already!</p>
 </blockquote>
 <p>Spawned fire spell itself does nothing at the time of casting it (except deducing mana), but the spawned fire effect job will do its work each turn.</p>
 <pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">use crossterm::{
@@ -7960,7 +7962,7 @@
 </span><span class="boring">
 </span><span class="boring">    yield_now().await;
 </span><span class="boring">}</span></code></pre>
-<p>Quite simpler to understand than explicit state machines signalled with events, don’t you think? Maintanance and expanding of such logic is also quite easy to perform, as there isn’t much of moving parts scattered around that need careful focus to connect.</p>
+<p>Quite simpler to understand than explicit state machines signalled with events, don’t you think? Maintanance and expanding of such logic is also quite easy to perform, as there isn’t much of moving parts scattered around that need careful focus to connect the dots.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="prompts"><a class="header" href="#prompts">Prompts</a></h1>
 <p>Prompts are kinds of coroutines where we have to await on specific user input.</p>
@@ -8592,12 +8594,12 @@
 </span><span class="boring">
 </span><span class="boring">    yield_now().await;
 </span><span class="boring">}</span></code></pre>
-<p>There are two things interesting us:</p>
+<p>There are two things interesting to us:</p>
 <ul>
 <li><code>wait_for_key()</code></li>
 <li><code>selected_action()</code></li>
 </ul>
-<p>Waiting for turn requires us to check for events if there is a specific key pressed event.</p>
+<p>Waiting for key requires us to check for events if there is a specific key pressed event.</p>
 <pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">use crossterm::{
 </span><span class="boring">    event::{Event, KeyCode},
 </span><span class="boring">    style::Stylize,

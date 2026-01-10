@@ -35,7 +35,7 @@
             const path_to_root = "../../";
             const default_light_theme = "ayu";
             const default_dark_theme = "ayu";
-            window.path_to_searchindex_js = "../../searchindex-10e9eeba.js";
+            window.path_to_searchindex_js = "../../searchindex-9a7fb58d.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../../toc-ced68be6.js"></script>
@@ -815,7 +815,7 @@
 </span><span class="boring">    yield_now().await;
 </span><span class="boring">}</span></code></pre>
 <blockquote>
-<p>Quick note: <code>AsyncShared&lt;T&gt;</code> is equivalent with <code>Arc&lt;RwLock&lt;T&gt;&gt;</code> in there to remove a bit of boilerplate. When using async runtimes to run async functions, those that are multithreaded, like Moirai or Tokio, they require data used in there to be <code>Send</code> and sometimes also <code>Sync</code> to make multithreading work.</p>
+<p>Quick note: <code>AsyncShared&lt;T&gt;</code> is equivalent with <code>Arc&lt;RwLock&lt;T&gt;&gt;</code> in there to remove a bit of boilerplate. When using async runtimes to run async functions, those that are multithreaded, like Moirai or Tokio, they require data used in there to be <code>Send</code> and sometimes also <code>Sync</code> to make multithreading work. Of course runtimes can have primitives to run thread-local futures, in that case you can use references to data, but general use is rather multithreaded runtimes.</p>
 </blockquote>
 <p>As you can see in the example, we have easily been able to express entire game loop as simple long-living coroutine.</p>
 <p>Now, let’s also take a look at one of the other coroutines we are calling in there, a player turn for example (as it will come handy for next chapter):</p>
@@ -1446,7 +1446,7 @@
 </span><span class="boring">
 </span><span class="boring">    yield_now().await;
 </span><span class="boring">}</span></code></pre>
-<p>You might be thinking right now, how that compares to traditional game state machine where each step of this is a separate state that handles its suspension and progression to other steps - you might remind yourself how boilerplate-y expressing stuff like that is. And yet with async we have got same behavior, without constructing such state machine ourselves. And we have got it autimated, just by having each step as an awaiting future.</p>
+<p>You might be thinking right now, how that compares to traditional game state machine where each step of this is a separate state that handles its suspension and progression to other steps - you might remind yourself how boilerplate-y expressing stuff like that is. And yet with async we have got same behavior, without constructing such state machine ourselves. And we have got it automated, just by having each step as an awaiting future.</p>
 <p>I would call it a quite big win, to be honest!</p>
 
                     </main>
