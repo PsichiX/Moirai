@@ -59,7 +59,7 @@ fn main_tokio_in_moirai() {
             counter
         })
         .unwrap();
-    
+
     println!("Moirai counter: {}", value);
 }
 
