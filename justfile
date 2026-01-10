@@ -12,6 +12,8 @@ test:
 
 miri:
   cargo +nightly miri test --manifest-path ./crates/_/Cargo.toml -- --nocapture
+  # TODO: Fix miri errors in ManagedBox lazy access - stacked borrows errors.
+  # cargo +nightly miri test --manifest-path ./crates/durable/Cargo.toml -- --nocapture
   
 clippy:
   cargo clippy --all --all-features
@@ -36,6 +38,15 @@ list-outdated:
 
 update:
   cargo update --manifest-path ./crates/_/Cargo.toml --aggressive
+  cargo update --manifest-path ./crates/durable/Cargo.toml --aggressive
+
+book:
+  mdbook build book
+
+book-dev:
+  mdbook watch book --open
 
 publish:
   cargo publish --no-verify --manifest-path ./crates/_/Cargo.toml
+  sleep 1
+  cargo publish --no-verify --manifest-path ./crates/durable/Cargo.toml

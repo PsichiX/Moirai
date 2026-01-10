@@ -1,7 +1,4 @@
-use moirai::{
-    coroutine::yield_now,
-    jobs::{JobLocation, Jobs},
-};
+use moirai::{coroutine::yield_now, job::JobLocation, jobs::Jobs};
 use std::time::Duration;
 
 fn main() {

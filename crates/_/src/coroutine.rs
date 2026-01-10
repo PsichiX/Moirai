@@ -1,19 +1,17 @@
-use crate::jobs::{
-    Job, JobContext, JobHandle, JobLocation, JobObject, JobOptions, JobPriority, JobQueue,
-    JobToken, JobsWaker, JobsWakerCommand,
+use crate::{
+    job::{Job, JobContext, JobHandle, JobLocation, JobObject, JobOptions, JobPriority, JobToken},
+    jobs::{JobsMeta, JobsRuntime, JobsTags, JobsWaker, JobsWakerCommand},
+    queue::JobQueue,
+    third_party::time::{Duration, Instant},
 };
-#[cfg(target_arch = "wasm32")]
-use instant::{Duration, Instant};
 use intuicio_data::{
     lifetime::LifetimeWeakState,
     managed::{DynamicManagedLazy, ManagedLazy},
 };
-#[cfg(not(target_arch = "wasm32"))]
-use std::time::{Duration, Instant};
 use std::{
     future::poll_fn,
     hash::Hash,
-    pin::Pin,
+    pin::{Pin, pin},
     sync::{Arc, Mutex, RwLock, atomic::Ordering, mpsc::Receiver},
     task::Poll,
 };
@@ -23,6 +21,7 @@ use typid::ID;
 pub struct OnExit {
     job: Option<JobObject>,
     queue: JobQueue,
+    closure: Option<Box<dyn FnOnce() + Send + Sync>>,
 }
 
 impl Drop for OnExit {
@@ -30,13 +29,85 @@ impl Drop for OnExit {
         if let Some(object) = self.job.take() {
             self.queue.enqueue(object);
         }
+        if let Some(closure) = self.closure.take() {
+            closure();
+        }
     }
 }
 
 impl OnExit {
     pub fn invalidate(mut self) {
         self.job = None;
+        self.closure = None;
     }
+}
+
+/// IMPORTANT: You must assign the result of this function to a named variable,
+/// otherwise the future will be executed immediately!
+#[must_use]
+pub async fn on_exit(future: impl Future<Output = ()> + Send + Sync + 'static) -> OnExit {
+    let mut job = Some(Job(Box::pin(future)));
+    #[cfg(debug_assertions)]
+    let creation_backtrace = std::backtrace::Backtrace::capture().to_string();
+    poll_fn(move |cx| {
+        let waker = cx.waker();
+        let result = if let Some(waker) = JobsWaker::try_cast(waker) {
+            if let Some(job) = job.take() {
+                OnExit {
+                    job: Some(JobObject {
+                        id: ID::new(),
+                        job,
+                        context: Default::default(),
+                        location: JobLocation::current_thread(),
+                        priority: JobPriority::High,
+                        cancel: waker.runtime.cancel.clone(),
+                        suspend: waker.runtime.suspend.clone(),
+                        meta: waker.runtime.local_meta.clone(),
+                        tags: JobsTags::default(),
+                        #[cfg(debug_assertions)]
+                        creation_backtrace: creation_backtrace.clone(),
+                        #[cfg(feature = "tracing")]
+                        tracing_span: None,
+                    }),
+                    queue: waker.runtime.queue.clone(),
+                    closure: None,
+                }
+            } else {
+                Default::default()
+            }
+        } else {
+            Default::default()
+        };
+        waker.wake_by_ref();
+        Poll::Ready(result)
+    })
+    .await
+}
+
+/// IMPORTANT: You must assign the result of this function to a named variable,
+/// otherwise the future will be executed immediately!
+#[must_use]
+pub async fn on_exit_closure(f: impl FnOnce() + Send + Sync + 'static) -> OnExit {
+    let mut f = Some(f);
+    poll_fn(move |cx| {
+        let waker = cx.waker();
+        let result = if let Some(waker) = JobsWaker::try_cast(waker) {
+            if let Some(closure) = f.take() {
+                OnExit {
+                    job: None,
+                    queue: waker.runtime.queue.clone(),
+                    closure: Some(Box::new(closure)),
+                }
+            } else {
+                Default::default()
+            }
+        } else {
+            Default::default()
+        };
+        waker.wake_by_ref();
+        Poll::Ready(result)
+    })
+    .await
 }
 
 pub async fn yield_now() {
@@ -83,11 +154,55 @@ pub async fn with_any<T>(
     .await
 }
 
+pub enum CompletionImportance<T> {
+    Required(Pin<Box<dyn Future<Output = T> + Send + Sync>>),
+    Ignored(Pin<Box<dyn Future<Output = T> + Send + Sync>>),
+}
+
+impl<T> CompletionImportance<T> {
+    pub fn required(future: impl Future<Output = T> + Send + Sync + 'static) -> Self {
+        CompletionImportance::Required(Box::pin(future))
+    }
+
+    pub fn ignored(future: impl Future<Output = T> + Send + Sync + 'static) -> Self {
+        CompletionImportance::Ignored(Box::pin(future))
+    }
+}
+
+#[allow(clippy::type_complexity)]
+pub async fn with_importance<T>(mut futures: Vec<CompletionImportance<T>>) -> Vec<T> {
+    let mut results = Vec::with_capacity(futures.len());
+    let count = futures
+        .iter()
+        .filter(|f| matches!(f, CompletionImportance::Required(_)))
+        .count();
+    poll_fn(move |cx| {
+        futures.retain_mut(|future| match future {
+            CompletionImportance::Required(future) => match future.as_mut().poll(cx) {
+                Poll::Ready(output) => {
+                    results.push(output);
+                    false
+                }
+                Poll::Pending => true,
+            },
+            CompletionImportance::Ignored(future) => future.as_mut().poll(cx).is_pending(),
+        });
+        if results.len() == count {
+            cx.waker().wake_by_ref();
+            Poll::Ready(std::mem::take(&mut results))
+        } else {
+            cx.waker().wake_by_ref();
+            Poll::Pending
+        }
+    })
+    .await
+}
+
 pub async fn location() -> JobLocation {
     poll_fn(move |cx| {
         let waker = cx.waker();
         let result = if let Some(waker) = JobsWaker::try_cast(waker) {
-            waker.location()
+            waker.runtime.location.clone()
         } else {
             JobLocation::Unknown
         };
@@ -101,12 +216,23 @@ pub async fn context() -> JobContext {
     poll_fn(move |cx| {
         let waker = cx.waker();
         let result = if let Some(waker) = JobsWaker::try_cast(waker) {
-            waker.context()
+            waker.runtime.context
         } else {
-            JobContext {
-                work_group_index: 0,
-                work_groups_count: 1,
-            }
+            Default::default()
+        };
+        waker.wake_by_ref();
+        Poll::Ready(result)
+    })
+    .await
+}
+
+pub async fn runtime() -> JobsRuntime {
+    poll_fn(move |cx| {
+        let waker = cx.waker();
+        let result = if let Some(waker) = JobsWaker::try_cast(waker) {
+            waker.runtime.clone()
+        } else {
+            Default::default()
         };
         waker.wake_by_ref();
         Poll::Ready(result)
@@ -118,7 +244,7 @@ pub async fn priority() -> JobPriority {
     poll_fn(move |cx| {
         let waker = cx.waker();
         let result = if let Some(waker) = JobsWaker::try_cast(waker) {
-            waker.priority()
+            waker.runtime.priority
         } else {
             Default::default()
         };
@@ -137,7 +263,7 @@ pub async fn suspend() {
             Poll::Ready(())
         } else {
             if let Some(waker) = JobsWaker::try_cast(waker) {
-                waker.suspend.store(true, Ordering::Relaxed);
+                waker.runtime.suspend.store(true, Ordering::Relaxed);
             }
             executed = true;
             waker.wake_by_ref();
@@ -151,7 +277,7 @@ pub async fn acquire_token<T: Hash>(subject: &T) -> JobToken {
     poll_fn(move |cx| {
         let waker = cx.waker();
         let result = if let Some(waker) = JobsWaker::try_cast(waker) {
-            waker.acquire_token(subject)
+            waker.runtime.hash_tokens.acquire_token(subject)
         } else {
             Some(JobToken::default())
         };
@@ -168,7 +294,10 @@ pub async fn acquire_token_timeout<T: Hash>(subject: &T, timeout: Duration) -> J
     poll_fn(move |cx| {
         let waker = cx.waker();
         let result = if let Some(waker) = JobsWaker::try_cast(waker) {
-            waker.acquire_token_timeout(subject, timeout)
+            waker
+                .runtime
+                .hash_tokens
+                .acquire_token_timeout(subject, timeout)
         } else {
             Some(JobToken::default())
         };
@@ -181,11 +310,29 @@ pub async fn acquire_token_timeout<T: Hash>(subject: &T, timeout: Duration) -> J
     .await
 }
 
+pub async fn meta_store_local<T>(name: impl ToString, lazy: ManagedLazy<T>) {
+    let mut name = Some(name.to_string());
+    let mut lazy = Some(lazy.into_dynamic());
+    poll_fn(move |cx| {
+        let waker = cx.waker();
+        if let Some(waker) = JobsWaker::try_cast(waker) {
+            waker
+                .runtime
+                .local_meta
+                .set(name.take().unwrap(), lazy.take().unwrap());
+        }
+        waker.wake_by_ref();
+        Poll::Ready(())
+    })
+    .await
+}
+
 pub async fn meta<T>(name: &str) -> Option<ManagedLazy<T>> {
     poll_fn(move |cx| {
         let waker = cx.waker();
         let result = if let Some(waker) = JobsWaker::try_cast(waker) {
             waker
+                .runtime
                 .get_meta(name)
                 .and_then(|lazy| lazy.into_typed::<T>().ok())
         } else {
@@ -201,9 +348,23 @@ pub async fn meta_dynamic(name: &str) -> Option<DynamicManagedLazy> {
     poll_fn(move |cx| {
         let waker = cx.waker();
         let result = if let Some(waker) = JobsWaker::try_cast(waker) {
-            waker.get_meta(name)
+            waker.runtime.get_meta(name)
         } else {
             None
+        };
+        waker.wake_by_ref();
+        Poll::Ready(result)
+    })
+    .await
+}
+
+pub async fn tags() -> JobsTags {
+    poll_fn(move |cx| {
+        let waker = cx.waker();
+        let result = if let Some(waker) = JobsWaker::try_cast(waker) {
+            waker.runtime.tags.clone()
+        } else {
+            Default::default()
         };
         waker.wake_by_ref();
         Poll::Ready(result)
@@ -266,18 +427,16 @@ pub async fn spawn<T: Send + 'static>(
         let waker = cx.waker();
         if let Some(job) = job.take() {
             if let Some(waker) = JobsWaker::try_cast(waker) {
-                waker.enqueue(JobObject {
+                waker.runtime.queue.enqueue(JobObject {
                     id: ID::new(),
                     job,
-                    context: JobContext {
-                        work_group_index: 0,
-                        work_groups_count: 1,
-                    },
+                    context: Default::default(),
                     location: options.location.clone(),
                     priority: options.priority,
                     cancel: handle2.cancel.clone(),
                     suspend: handle2.suspend.clone(),
-                    meta: waker.local_meta(),
+                    meta: waker.runtime.local_meta.clone(),
+                    tags: options.tags.clone(),
                     #[cfg(debug_assertions)]
                     creation_backtrace: creation_backtrace.clone(),
                     #[cfg(feature = "tracing")]
@@ -312,18 +471,16 @@ pub async fn spawn_closure<T: Send + 'static>(
         let waker = cx.waker();
         if let Some(job) = job.take() {
             if let Some(waker) = JobsWaker::try_cast(waker) {
-                waker.enqueue(JobObject {
+                waker.runtime.queue.enqueue(JobObject {
                     id: ID::new(),
                     job,
-                    context: JobContext {
-                        work_group_index: 0,
-                        work_groups_count: 1,
-                    },
+                    context: Default::default(),
                     location: options.location.clone(),
                     priority: options.priority,
                     cancel: handle2.cancel.clone(),
                     suspend: handle2.suspend.clone(),
-                    meta: waker.local_meta(),
+                    meta: waker.runtime.local_meta.clone(),
+                    tags: options.tags.clone(),
                     #[cfg(debug_assertions)]
                     creation_backtrace: creation_backtrace.clone(),
                     #[cfg(feature = "tracing")]
@@ -341,11 +498,25 @@ pub async fn spawn_closure<T: Send + 'static>(
     result
 }
 
+pub async fn queue() -> JobQueue {
+    poll_fn(move |cx| {
+        let waker = cx.waker();
+        let result = if let Some(waker) = JobsWaker::try_cast(waker) {
+            waker.runtime.queue.clone()
+        } else {
+            JobQueue::default()
+        };
+        waker.wake_by_ref();
+        Poll::Ready(result)
+    })
+    .await
+}
+
 pub async fn run_queue(queue: &JobQueue) {
     poll_fn(|cx| {
         let waker = cx.waker();
         if let Some(waker) = JobsWaker::try_cast(waker) {
-            waker.run_queue(queue);
+            waker.runtime.run_queue(queue);
         }
         waker.wake_by_ref();
         Poll::Ready(())
@@ -353,15 +524,14 @@ pub async fn run_queue(queue: &JobQueue) {
     .await
 }
 
-pub async fn run_queue_with_meta(
-    queue: &JobQueue,
-    worker_meta: impl IntoIterator<Item = (String, DynamicManagedLazy)>,
-) {
+pub async fn run_queue_with_meta(queue: &JobQueue, worker_meta: JobsMeta) {
     let mut worker_meta = Some(worker_meta);
     poll_fn(move |cx| {
         let waker = cx.waker();
         if let Some(waker) = JobsWaker::try_cast(waker) {
-            waker.run_queue_with_meta(queue, worker_meta.take().unwrap());
+            waker
+                .runtime
+                .run_queue_with_meta(queue, worker_meta.take().unwrap());
         }
         waker.wake_by_ref();
         Poll::Ready(())
@@ -373,7 +543,7 @@ pub async fn run_queue_timeout(queue: &JobQueue, timeout: Duration) {
     poll_fn(|cx| {
         let waker = cx.waker();
         if let Some(waker) = JobsWaker::try_cast(waker) {
-            waker.run_queue_timeout(queue, timeout);
+            waker.runtime.run_queue_timeout(queue, timeout);
         }
         waker.wake_by_ref();
         Poll::Ready(())
@@ -384,59 +554,18 @@ pub async fn run_queue_timeout(queue: &JobQueue, timeout: Duration) {
 pub async fn run_queue_timeout_with_meta(
     queue: &JobQueue,
     timeout: Duration,
-    worker_meta: impl IntoIterator<Item = (String, DynamicManagedLazy)>,
+    worker_meta: JobsMeta,
 ) {
     let mut worker_meta = Some(worker_meta);
     poll_fn(move |cx| {
         let waker = cx.waker();
         if let Some(waker) = JobsWaker::try_cast(waker) {
-            waker.run_queue_timeout_with_meta(queue, timeout, worker_meta.take().unwrap());
+            waker
+                .runtime
+                .run_queue_timeout_with_meta(queue, timeout, worker_meta.take().unwrap());
         }
         waker.wake_by_ref();
         Poll::Ready(())
-    })
-    .await
-}
-
-/// IMPORTANT: You must assign the result of this function to a named variable,
-/// otherwise the future will be executed immediately!
-#[must_use]
-pub async fn on_exit(future: impl Future<Output = ()> + Send + Sync + 'static) -> OnExit {
-    let mut job = Some(Job(Box::pin(future)));
-    #[cfg(debug_assertions)]
-    let creation_backtrace = std::backtrace::Backtrace::capture().to_string();
-    poll_fn(move |cx| {
-        let waker = cx.waker();
-        let result = if let Some(waker) = JobsWaker::try_cast(waker) {
-            if let Some(job) = job.take() {
-                OnExit {
-                    job: Some(JobObject {
-                        id: ID::new(),
-                        job,
-                        context: JobContext {
-                            work_group_index: 0,
-                            work_groups_count: 1,
-                        },
-                        location: JobLocation::current_thread(),
-                        priority: JobPriority::High,
-                        cancel: waker.cancel(),
-                        suspend: waker.suspend(),
-                        meta: waker.local_meta(),
-                        #[cfg(debug_assertions)]
-                        creation_backtrace: creation_backtrace.clone(),
-                        #[cfg(feature = "tracing")]
-                        tracing_span: None,
-                    }),
-                    queue: waker.queue(),
-                }
-            } else {
-                Default::default()
-            }
-        } else {
-            Default::default()
-        };
-        waker.wake_by_ref();
-        Poll::Ready(result)
     })
     .await
 }
@@ -445,7 +574,7 @@ pub async fn cancellable<F: Future>(
     mut condition: impl FnMut() -> bool,
     future: F,
 ) -> Option<F::Output> {
-    let mut future = Box::pin(future);
+    let mut future = pin!(future);
     poll_fn(move |cx| {
         if condition() {
             cx.waker().wake_by_ref();
@@ -503,7 +632,7 @@ pub async fn wait_time(duration: Duration) -> Duration {
         let elapsed = timer.elapsed();
         if elapsed >= duration {
             cx.waker().wake_by_ref();
-            Poll::Ready(elapsed - duration)
+            Poll::Ready(elapsed.saturating_sub(duration))
         } else {
             cx.waker().wake_by_ref();
             Poll::Pending
@@ -566,6 +695,7 @@ pub async fn wait_for_meta<T>(name: &str) -> ManagedLazy<T> {
         let waker = cx.waker();
         let result = JobsWaker::try_cast(waker).and_then(|waker| {
             waker
+                .runtime
                 .get_meta(name)
                 .and_then(|lazy| lazy.into_typed::<T>().ok())
         });
@@ -583,7 +713,7 @@ pub async fn wait_for_meta<T>(name: &str) -> ManagedLazy<T> {
 pub async fn wait_for_meta_dynamic(name: &str) -> DynamicManagedLazy {
     poll_fn(move |cx| {
         let waker = cx.waker();
-        let result = JobsWaker::try_cast(waker).and_then(|waker| waker.get_meta(name));
+        let result = JobsWaker::try_cast(waker).and_then(|waker| waker.runtime.get_meta(name));
         if let Some(result) = result {
             cx.waker().wake_by_ref();
             Poll::Ready(result)
@@ -636,7 +766,7 @@ pub async fn strategy<F: Future>(
     mut strategy: impl FnMut() -> StrategyDecision,
     future: F,
 ) -> Option<F::Output> {
-    let mut future = Box::pin(future);
+    let mut future = pin!(future);
     poll_fn(move |cx| match future.as_mut().poll(cx) {
         Poll::Ready(output) => {
             cx.waker().wake_by_ref();

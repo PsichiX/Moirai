@@ -1,24 +1,21 @@
-use moirai::{
-    coroutine::yield_now,
-    jobs::{JobLocation, Jobs},
-};
+use moirai::{coroutine::yield_now, job::JobLocation, jobs::Jobs};
 
 fn main() {
     let jobs = Jobs::default();
 
-    // Spawn a job on the local worker.
     let job = jobs.spawn(JobLocation::Local, async {
         let mut counter = 0;
         for _ in 0..10 {
             counter += 1;
+            // Yield execution to allow other jobs to run.
             yield_now().await;
         }
         counter
     });
 
-    while !jobs.queue_is_empty() {
+    while !jobs.queue().is_empty() {
         // Run jobs on the local worker. This step is needed in order to process
-        // jobs, as they are only ran on demand, since they doesn't have a
+        // local jobs, as they are only ran on demand, since they doesn't have a
         // dedicated thread. Additionally this runs only single pass of future
         // polls for each stored local job, not blocking untill all are done.
         // This allows to interleave local job processing with other application
@@ -29,6 +26,7 @@ fn main() {
         jobs.run_local();
     }
 
-    let counter = job.wait().unwrap();
+    // Retrieve the job result when it's completed.
+    let counter = job.take_result().unwrap();
     println!("Counter: {}", counter);
 }

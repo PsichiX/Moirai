@@ -1,6 +1,7 @@
 use moirai::{
     coroutine::{StrategyDecision, location, priority, strategy_timeline, yield_now},
-    jobs::{JobLocation, JobPriority, Jobs},
+    job::{JobLocation, JobPriority},
+    jobs::Jobs,
 };
 use std::time::Duration;
 
@@ -46,7 +47,7 @@ fn main() {
 
     let job = jobs.spawn(JobLocation::Local, strategy_timeline(timeline, task));
 
-    while !jobs.queue_is_empty() {
+    while !jobs.queue().is_empty() {
         jobs.run_local();
     }
 

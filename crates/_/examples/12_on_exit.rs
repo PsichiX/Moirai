@@ -24,5 +24,5 @@ fn main() {
     })
     .wait();
 
-    while !jobs.queue_is_empty() {}
+    while !jobs.queue().is_empty() {}
 }

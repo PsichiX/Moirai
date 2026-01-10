@@ -11,5 +11,5 @@ fn main() {
     });
 
     // Just waiting for the job to be processed.
-    while !jobs.queue_is_empty() {}
+    while !jobs.queue().is_empty() {}
 }

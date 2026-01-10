@@ -1,7 +1,9 @@
 use intuicio_data::lifetime::Lifetime;
 use moirai::{
     coroutine::{lifetime_bound, run_queue},
-    jobs::{JobLocation, JobQueue, Jobs},
+    job::JobLocation,
+    jobs::Jobs,
+    queue::JobQueue,
 };
 
 // This example demonstrates how to create and use custom job queues with

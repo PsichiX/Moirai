@@ -1,7 +1,4 @@
-use moirai::{
-    coroutine::move_to,
-    jobs::{JobLocation, Jobs},
-};
+use moirai::{coroutine::move_to, job::JobLocation, jobs::Jobs};
 
 fn main() {
     let jobs = Jobs::default();
@@ -22,7 +19,7 @@ fn main() {
         filtered.fold(0, |acc, x| acc + x * x)
     });
 
-    while !jobs.queue_is_empty() {
+    while !jobs.queue().is_empty() {
         jobs.run_local();
     }
 

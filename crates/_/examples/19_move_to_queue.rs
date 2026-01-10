@@ -1,7 +1,4 @@
-use moirai::{
-    coroutine::move_to,
-    jobs::{JobLocation, JobQueue, Jobs},
-};
+use moirai::{coroutine::move_to, job::JobLocation, jobs::Jobs, queue::JobQueue};
 
 fn main() {
     let jobs = Jobs::default();
@@ -20,7 +17,7 @@ fn main() {
 
     // First run local jobs.
     println!("Running local jobs");
-    while !jobs.queue_is_empty() {
+    while !jobs.queue().is_empty() {
         jobs.run_local();
     }
 

@@ -1,6 +1,7 @@
 use moirai::{
     coroutine::{change_priority, yield_now},
-    jobs::{JobLocation, JobPriority, Jobs},
+    job::{JobLocation, JobPriority},
+    jobs::Jobs,
 };
 
 fn main() {
@@ -27,7 +28,7 @@ fn main() {
     // We spawned local jobs to better show deterministic execution order.
     // In case of threaded jobs, the order may vary due to jobs stealing,
     // while priority is kept within a single thread.
-    while !jobs.queue_is_empty() {
+    while !jobs.queue().is_empty() {
         println!("Running local jobs");
         jobs.run_local();
     }

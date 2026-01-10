@@ -1,7 +1,9 @@
 use intuicio_data::managed::Managed;
 use moirai::{
     coroutine::{meta, move_to},
-    jobs::{JobLocation, JobQueue, Jobs},
+    job::JobLocation,
+    jobs::Jobs,
+    queue::JobQueue,
 };
 use std::time::{Duration, Instant};
 
@@ -43,7 +45,7 @@ fn main() {
     // Emulate main loop with frame boundaries.
     // Here we just run until queues are empty,
     // but in your app you tell when to stop.
-    while !jobs.queue_is_empty() || !next_frame_queue.read().unwrap().is_empty() {
+    while !jobs.queue().is_empty() || !next_frame_queue.read().unwrap().is_empty() {
         println!(
             "Submiting next frame jobs: {}",
             next_frame_queue.read().unwrap().len()
@@ -59,7 +61,11 @@ fn main() {
         // If you run local queue once per frame, jobs on hitting pending would
         // never get chance to run again in the same frame, which we care about
         // when we need to progress jobs until next frame hits.
-        while jobs.queue_filter_count(|_, location, _, _, _| *location == JobLocation::Local) > 0 {
+        while jobs
+            .queue()
+            .filter_count(|object| *object.location() == JobLocation::Local)
+            > 0
+        {
             // We need to update timeout based on elapsed time to keep frame
             // rate stable. If we run local queue without timeout, jobs might
             // consume more time that frame budget allows. Or worse, if no next

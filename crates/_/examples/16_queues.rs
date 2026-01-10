@@ -1,4 +1,4 @@
-use moirai::jobs::{JobQueue, Jobs};
+use moirai::{jobs::Jobs, queue::JobQueue};
 
 fn main() {
     let jobs = Jobs::default();

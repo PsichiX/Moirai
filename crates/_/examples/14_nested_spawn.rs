@@ -1,6 +1,7 @@
 use moirai::{
     coroutine::{spawn, spawn_closure},
-    jobs::{JobLocation, Jobs},
+    job::JobLocation,
+    jobs::Jobs,
 };
 
 fn main() {

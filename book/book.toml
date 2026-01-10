@@ -1,0 +1,18 @@
+[book]
+authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
+language = "en"
+src = "src"
+title = "Moirai - Fearless game coroutines"
+
+[rust]
+edition = "2024"
+
+[build]
+extra-watch-dirs = ["./samples/examples"]
+
+[output.html]
+default-theme = "Ayu"
+preferred-dark-theme = "Ayu"
+
+[output.html.fold]
+enable = true

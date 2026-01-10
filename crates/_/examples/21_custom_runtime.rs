@@ -1,7 +1,4 @@
-use moirai::{
-    coroutine::move_to,
-    jobs::{JobLocation, JobQueue},
-};
+use moirai::{coroutine::move_to, job::JobLocation, queue::JobQueue};
 use std::{
     sync::{
         Arc,
@@ -69,7 +66,7 @@ impl Runtime {
             true,
             Duration::from_millis(1),
             Default::default(),
-            [],
+            Default::default(),
             Default::default(),
             // For simplicity we don't use worker notifiers.
             Default::default(),
@@ -127,7 +124,7 @@ impl RuntimeWorker {
                     true,
                     Duration::from_millis(1),
                     Default::default(),
-                    [],
+                    Default::default(),
                     Default::default(),
                     Default::default(),
                 );

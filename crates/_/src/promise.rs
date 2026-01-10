@@ -1,6 +1,8 @@
-use std::future::Future;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use std::{
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
@@ -127,6 +129,12 @@ impl<T, E> Future for Promise<T, E> {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         self.future.as_mut().poll(cx)
+    }
+}
+
+impl<T: 'static + Send, F: Future<Output = T> + Send + 'static> From<F> for Promise<T, ()> {
+    fn from(future: F) -> Self {
+        Promise::new(async move { Ok(future.await) })
     }
 }
 

@@ -1,876 +1,150 @@
-use crate::coroutine::context;
-#[cfg(target_arch = "wasm32")]
-use instant::{Duration, Instant};
-use intuicio_data::managed::{DynamicManagedLazy, ManagedLazy};
-#[cfg(not(target_arch = "wasm32"))]
-use std::time::{Duration, Instant};
+use crate::{
+    coroutine::context,
+    job::{
+        AllJobsHandle, Job, JobContext, JobHandle, JobLocation, JobObject, JobOptions, JobPriority,
+        JobTokens,
+    },
+    queue::JobQueue,
+    third_party::time::Duration,
+};
+use intuicio_data::{
+    managed::{DynamicManagedLazy, ManagedLazy},
+    managed_box::DynamicManagedBox,
+    type_hash::TypeHash,
+};
 use std::{
-    collections::{HashMap, HashSet, LinkedList},
-    hash::{DefaultHasher, Hash, Hasher},
-    pin::Pin,
+    borrow::Cow,
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    future::poll_fn,
+    pin::{Pin, pin},
     sync::{
         Arc, Condvar, Mutex, RwLock,
         atomic::{AtomicBool, Ordering},
         mpsc::{Receiver, Sender},
     },
     task::{Context, Poll, RawWaker, RawWakerVTable, Wake, Waker},
-    thread::{JoinHandle, ThreadId, available_parallelism, spawn},
+    thread::{JoinHandle, available_parallelism, spawn},
 };
 use typid::ID;
 
-#[derive(Default, Clone)]
-pub struct JobOptions {
-    pub location: JobLocation,
-    pub priority: JobPriority,
-    pub meta: HashMap<String, DynamicManagedLazy>,
+#[derive(Default, Clone, PartialEq, Eq)]
+pub struct JobsTags {
+    tags: HashSet<TypeHash>,
 }
 
-impl JobOptions {
-    pub fn location(mut self, location: JobLocation) -> Self {
-        self.location = location;
+impl JobsTags {
+    pub fn new(iter: impl IntoIterator<Item = TypeHash>) -> Self {
+        Self {
+            tags: iter.into_iter().collect(),
+        }
+    }
+
+    pub fn with<T: 'static + ?Sized>(mut self) -> Self {
+        self.add::<T>();
         self
     }
 
-    pub fn priority(mut self, priority: JobPriority) -> Self {
-        self.priority = priority;
-        self
+    pub fn extend(&mut self, iter: impl IntoIterator<Item = TypeHash>) {
+        self.tags.extend(iter);
     }
 
-    pub fn meta(mut self, name: impl ToString, value: DynamicManagedLazy) -> Self {
-        self.meta.insert(name.to_string(), value);
-        self
+    pub fn add<T: 'static + ?Sized>(&mut self) {
+        self.tags.insert(TypeHash::of::<T>());
     }
 
-    pub fn meta_many(
-        mut self,
-        meta: impl IntoIterator<Item = (String, DynamicManagedLazy)>,
-    ) -> Self {
-        self.meta.extend(meta);
-        self
-    }
-}
-
-impl From<()> for JobOptions {
-    fn from(_: ()) -> Self {
-        Default::default()
-    }
-}
-
-impl From<JobLocation> for JobOptions {
-    fn from(location: JobLocation) -> Self {
-        Self {
-            location,
-            ..Default::default()
-        }
-    }
-}
-
-impl From<JobPriority> for JobOptions {
-    fn from(priority: JobPriority) -> Self {
-        Self {
-            priority,
-            ..Default::default()
-        }
-    }
-}
-
-impl From<(JobLocation, JobPriority)> for JobOptions {
-    fn from((location, priority): (JobLocation, JobPriority)) -> Self {
-        Self {
-            location,
-            priority,
-            ..Default::default()
-        }
-    }
-}
-
-pub(crate) struct Job(pub(crate) Pin<Box<dyn Future<Output = ()> + Send + Sync>>);
-
-impl Job {
-    fn poll(
-        mut self,
-        cx: &mut Context<'_>,
-        #[cfg(debug_assertions)] creation_backtrace: &str,
-    ) -> Option<Self> {
-        let poll_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            match self.0.as_mut().poll(cx) {
-                Poll::Ready(_) => None,
-                Poll::Pending => Some(self),
-            }
-        }));
-        match poll_result {
-            Ok(result) => result,
-            Err(_err) => {
-                #[cfg(debug_assertions)]
-                {
-                    tracing::error!("Job panicked! Creation backtrace:\n{}", creation_backtrace);
-                    if let Some(s) = _err.downcast_ref::<&str>() {
-                        tracing::error!("Panic info: {}", s);
-                    } else if let Some(s) = _err.downcast_ref::<String>() {
-                        tracing::error!("Panic info: {}", s);
-                    } else if let Some(e) = _err.downcast_ref::<Box<dyn std::error::Error>>() {
-                        tracing::error!("Panic error: {}", e);
-                    }
-                }
-                None
-            }
-        }
-    }
-}
-
-#[inline]
-fn traced_spin_loop() {
-    #[cfg(feature = "deadlock-trace")]
-    println!(
-        "* DEADLOCK BACKTRACE: {}",
-        std::backtrace::Backtrace::force_capture()
-    );
-    std::hint::spin_loop();
-}
-
-pub struct JobHandle<T: Send + 'static> {
-    result: Arc<Mutex<Option<Option<T>>>>,
-    pub(crate) cancel: Arc<AtomicBool>,
-    pub(crate) suspend: Arc<AtomicBool>,
-    pub(crate) meta: JobsMeta,
-}
-
-impl<T: Send + 'static> Default for JobHandle<T> {
-    fn default() -> Self {
-        Self {
-            result: Default::default(),
-            cancel: Default::default(),
-            suspend: Default::default(),
-            meta: Default::default(),
-        }
-    }
-}
-
-impl<T: Send + 'static> JobHandle<T> {
-    pub fn new(value: T) -> Self {
-        Self {
-            result: Arc::new(Mutex::new(Some(Some(value)))),
-            cancel: Default::default(),
-            suspend: Default::default(),
-            meta: Default::default(),
-        }
+    pub fn remove<T: 'static + ?Sized>(&mut self) {
+        self.tags.remove(&TypeHash::of::<T>());
     }
 
-    pub(crate) fn with_meta(
-        mut self,
-        iter: impl IntoIterator<Item = (String, DynamicManagedLazy)>,
-    ) -> Self {
-        self.meta = self.meta.with_many(iter);
-        self
+    pub fn contains<T: 'static + ?Sized>(&self) -> bool {
+        self.tags.contains(&TypeHash::of::<T>())
     }
 
-    pub fn is_cancelled(&self) -> bool {
-        self.cancel.load(Ordering::Relaxed)
+    pub fn is_superset_of(&self, other: &JobsTags) -> bool {
+        self.tags.is_superset(&other.tags)
     }
 
-    pub fn is_suspended(&self) -> bool {
-        self.suspend.load(Ordering::Relaxed)
+    pub fn is_subset_of(&self, other: &JobsTags) -> bool {
+        self.tags.is_subset(&other.tags)
     }
 
-    pub fn is_done(&self) -> bool {
-        self.result
-            .try_lock()
-            .ok()
-            .map(|guard| guard.is_some())
-            .unwrap_or_default()
+    pub fn clear(&mut self) {
+        self.tags.clear();
     }
 
-    pub fn try_take(&self) -> Option<Option<T>> {
-        self.result
-            .try_lock()
-            .ok()
-            .and_then(|mut result| result.take())
-    }
-
-    pub fn wait(self) -> Option<T> {
-        loop {
-            if let Some(result) = self.try_take() {
-                return result;
-            } else {
-                traced_spin_loop();
-            }
-        }
-    }
-
-    pub fn cancel(&self) {
-        self.cancel.store(true, Ordering::Relaxed);
-        if let Ok(mut result) = self.result.lock() {
-            *result = Some(None);
-        }
-        self.resume();
-    }
-
-    pub fn suspend(&self) {
-        self.suspend.store(true, Ordering::Relaxed);
-    }
-
-    pub fn resume(&self) {
-        self.suspend.store(false, Ordering::Relaxed);
-    }
-
-    pub(crate) fn put(&self, value: T) {
-        if let Ok(mut result) = self.result.lock() {
-            *result = Some(Some(value));
-        }
-    }
-}
-
-impl<T: Send + 'static> Clone for JobHandle<T> {
-    fn clone(&self) -> Self {
-        Self {
-            result: self.result.clone(),
-            cancel: self.cancel.clone(),
-            suspend: self.suspend.clone(),
-            meta: self.meta.clone(),
-        }
-    }
-}
-
-impl<T: Send + 'static> Future for JobHandle<T> {
-    type Output = Option<T>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if let Some(result) = self.try_take() {
-            cx.waker().wake_by_ref();
-            Poll::Ready(result)
-        } else {
-            cx.waker().wake_by_ref();
-            Poll::Pending
-        }
-    }
-}
-
-pub struct AllJobsHandle<T: Send + 'static> {
-    jobs: Vec<JobHandle<T>>,
-}
-
-impl<T: Send + 'static> Default for AllJobsHandle<T> {
-    fn default() -> Self {
-        Self {
-            jobs: Default::default(),
-        }
-    }
-}
-
-impl<T: Send + 'static> AllJobsHandle<T> {
-    pub fn new(value: T) -> Self {
-        Self {
-            jobs: vec![JobHandle::new(value)],
-        }
-    }
-
-    pub fn into_inner(self) -> Vec<JobHandle<T>> {
-        self.jobs
-    }
-
-    pub fn many(handles: impl IntoIterator<Item = JobHandle<T>>) -> Self {
-        Self {
-            jobs: handles.into_iter().collect(),
-        }
-    }
-
-    pub fn add(&mut self, handle: JobHandle<T>) {
-        self.jobs.push(handle);
-    }
-
-    pub fn iter(&self) -> impl Iterator<Item = &JobHandle<T>> {
-        self.jobs.iter()
-    }
-
-    pub fn extend(&mut self, handles: impl IntoIterator<Item = JobHandle<T>>) {
-        self.jobs.extend(handles);
-    }
-
-    pub fn is_done(&self) -> bool {
-        self.jobs.iter().all(|job| job.is_done())
-    }
-
-    pub fn try_take(&self) -> Option<Option<Vec<T>>> {
-        self.is_done()
-            .then(|| self.jobs.iter().flat_map(|job| job.try_take()).collect())
-    }
-
-    pub fn wait(self) -> Option<Vec<T>> {
-        self.jobs.into_iter().map(|job| job.wait()).collect()
-    }
-}
-
-impl<T: Send + 'static> Clone for AllJobsHandle<T> {
-    fn clone(&self) -> Self {
-        Self {
-            jobs: self.jobs.clone(),
-        }
-    }
-}
-
-impl<T: Send + 'static> Future for AllJobsHandle<T> {
-    type Output = Option<Vec<T>>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if let Some(result) = self.try_take() {
-            cx.waker().wake_by_ref();
-            Poll::Ready(result)
-        } else {
-            cx.waker().wake_by_ref();
-            Poll::Pending
-        }
-    }
-}
-
-pub struct AnyJobHandle<T: Send + 'static> {
-    jobs: Vec<JobHandle<T>>,
-}
-
-impl<T: Send + 'static> Default for AnyJobHandle<T> {
-    fn default() -> Self {
-        Self {
-            jobs: Default::default(),
-        }
-    }
-}
-
-impl<T: Send + 'static> AnyJobHandle<T> {
-    pub fn new(value: T) -> Self {
-        Self {
-            jobs: vec![JobHandle::new(value)],
-        }
-    }
-
-    pub fn into_inner(self) -> Vec<JobHandle<T>> {
-        self.jobs
-    }
-
-    pub fn many(handles: impl IntoIterator<Item = JobHandle<T>>) -> Self {
-        Self {
-            jobs: handles.into_iter().collect(),
-        }
-    }
-
-    pub fn add(&mut self, handle: JobHandle<T>) {
-        self.jobs.push(handle);
-    }
-
-    pub fn extend(&mut self, handles: impl IntoIterator<Item = JobHandle<T>>) {
-        self.jobs.extend(handles);
-    }
-
-    pub fn is_done(&self) -> bool {
-        self.jobs.iter().any(|job| job.is_done())
-    }
-
-    pub fn try_take(&self) -> Option<Option<T>> {
-        self.is_done()
-            .then(|| self.jobs.iter().find_map(|job| job.try_take()).flatten())
-    }
-
-    pub fn wait(self) -> Option<T> {
-        loop {
-            if let Some(result) = self.try_take() {
-                return result;
-            } else {
-                traced_spin_loop();
-            }
-        }
-    }
-}
-
-impl<T: Send + 'static> Clone for AnyJobHandle<T> {
-    fn clone(&self) -> Self {
-        Self {
-            jobs: self.jobs.clone(),
-        }
-    }
-}
-
-impl<T: Send + 'static> Future for AnyJobHandle<T> {
-    type Output = Option<T>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if let Some(result) = self.try_take() {
-            cx.waker().wake_by_ref();
-            Poll::Ready(result)
-        } else {
-            cx.waker().wake_by_ref();
-            Poll::Pending
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct JobContext {
-    pub work_group_index: usize,
-    pub work_groups_count: usize,
-}
-
-impl std::fmt::Display for JobContext {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "JobContext {{ work_group_index: {}, work_groups_count: {} }}",
-            self.work_group_index, self.work_groups_count
-        )
-    }
-}
-
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub enum JobPriority {
-    #[default]
-    Normal,
-    High,
-}
-
-impl std::fmt::Display for JobPriority {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            JobPriority::Normal => write!(f, "Normal"),
-            JobPriority::High => write!(f, "High"),
-        }
-    }
-}
-
-#[derive(Debug, Default, Clone, PartialEq)]
-pub enum JobLocation {
-    #[default]
-    Unknown,
-    Local,
-    NonLocal,
-    UnnamedWorker,
-    NamedWorker(String),
-    ExactThread(ThreadId),
-    OtherThanThread(ThreadId),
-    Exclusive,
-    Queue(JobQueue),
-}
-
-impl JobLocation {
-    pub fn named_worker(name: impl ToString) -> Self {
-        JobLocation::NamedWorker(name.to_string())
-    }
-
-    pub fn thread(thread: ThreadId) -> Self {
-        JobLocation::ExactThread(thread)
-    }
-
-    pub fn current_thread() -> Self {
-        JobLocation::ExactThread(std::thread::current().id())
-    }
-
-    pub fn other_than_current_thread() -> Self {
-        JobLocation::OtherThanThread(std::thread::current().id())
-    }
-}
-
-impl std::fmt::Display for JobLocation {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            JobLocation::Unknown => write!(f, "Unknown"),
-            JobLocation::Local => write!(f, "Local"),
-            JobLocation::NonLocal => write!(f, "Non-local"),
-            JobLocation::UnnamedWorker => write!(f, "Unnamed worker"),
-            JobLocation::NamedWorker(name) => write!(f, "Named worker: {name}"),
-            JobLocation::ExactThread(id) => write!(f, "Exact thread: {id:?}"),
-            JobLocation::OtherThanThread(id) => write!(f, "Other than thread: {id:?}"),
-            JobLocation::Exclusive => write!(f, "Exclusive"),
-            JobLocation::Queue(_) => write!(f, "Job queue"),
-        }
-    }
-}
-
-#[derive(Default, Clone)]
-pub struct JobTokens {
-    hash_tokens: Arc<Mutex<HashSet<u64>>>,
-}
-
-#[derive(Default)]
-pub struct JobToken {
-    hash_tokens: JobTokens,
-    hash: u64,
-}
-
-impl Drop for JobToken {
-    fn drop(&mut self) {
-        if let Ok(mut hash_tokens) = self.hash_tokens.hash_tokens.lock() {
-            hash_tokens.remove(&self.hash);
-        }
-    }
-}
-
-pub(crate) struct JobObject {
-    pub id: ID<Jobs>,
-    pub job: Job,
-    pub context: JobContext,
-    pub location: JobLocation,
-    pub priority: JobPriority,
-    pub cancel: Arc<AtomicBool>,
-    pub suspend: Arc<AtomicBool>,
-    pub meta: JobsMeta,
-    #[cfg(debug_assertions)]
-    pub creation_backtrace: String,
-    #[cfg(feature = "tracing")]
-    pub tracing_span: Option<tracing::Span>,
-}
-
-#[derive(Default, Clone)]
-pub struct JobQueue {
-    queue: Arc<RwLock<LinkedList<JobObject>>>,
-}
-
-impl JobQueue {
     pub fn is_empty(&self) -> bool {
-        self.queue.read().map_or(true, |queue| queue.is_empty())
+        self.tags.is_empty()
     }
 
     pub fn len(&self) -> usize {
-        self.queue.read().map_or(0, |queue| queue.len())
+        self.tags.len()
     }
 
-    pub fn filter_count(
-        &self,
-        // fn(id, location, priority, is_cancelled, is_suspended) -> bool
-        f: impl Fn(ID<Jobs>, &JobLocation, &JobPriority, bool, bool) -> bool,
-    ) -> usize {
-        self.queue
-            .read()
-            .map(|queue| {
-                queue
-                    .iter()
-                    .filter(|object| {
-                        f(
-                            object.id,
-                            &object.location,
-                            &object.priority,
-                            object.cancel.load(Ordering::Relaxed),
-                            object.suspend.load(Ordering::Relaxed),
-                        )
-                    })
-                    .count()
-            })
-            .unwrap_or_default()
+    pub fn iter(&self) -> impl Iterator<Item = TypeHash> {
+        self.tags.iter().copied()
     }
+}
 
-    pub fn clear(&self) {
-        if let Ok(mut queue) = self.queue.write() {
-            queue.clear();
-        }
-    }
+#[derive(Clone)]
+pub enum JobsMetaValue {
+    Boxed(DynamicManagedBox),
+    Lazy(DynamicManagedLazy),
+}
 
-    pub fn append(&self, other: &Self) {
-        if let Ok(mut other_queue) = other.queue.write() {
-            self.extend(std::mem::take(&mut *other_queue));
-        }
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    pub fn run(
-        &self,
-        worker_location: JobLocation,
-        ignore_location: bool,
-        timeout: Duration,
-        global_meta: JobsMeta,
-        worker_meta: impl IntoIterator<Item = (String, DynamicManagedLazy)>,
-        hash_tokens: JobTokens,
-        notifier: WorkerNotifier,
-    ) {
-        let timer = Instant::now();
-        let mut pending = vec![];
-        let worker_meta = JobsMeta::default().with_many(worker_meta);
-        while let Some(object) = self.dequeue(&worker_location, ignore_location) {
-            if object.location == JobLocation::Exclusive {
-                Worker::exclusive(
-                    object,
-                    self.clone(),
-                    global_meta.clone(),
-                    Default::default(),
-                    hash_tokens.clone(),
-                    notifier.clone(),
-                );
-                continue;
-            }
-            let JobObject {
-                id,
-                job,
-                context,
-                location,
-                mut priority,
-                cancel,
-                suspend,
-                meta,
-                #[cfg(debug_assertions)]
-                creation_backtrace,
-                #[cfg(feature = "tracing")]
-                mut tracing_span,
-            } = object;
-            let mut notify_workers = false;
-            let (poll_result, receiver) = if cancel.load(Ordering::Relaxed) {
-                let (_, rx) = std::sync::mpsc::channel();
-                (None, rx)
-            } else if suspend.load(Ordering::Relaxed) {
-                let (_, rx) = std::sync::mpsc::channel();
-                (Some(job), rx)
-            } else {
-                let (waker, receiver) = JobsWaker::new_waker(
-                    self.clone(),
-                    location.clone(),
-                    context,
-                    priority,
-                    global_meta.clone(),
-                    worker_meta.clone(),
-                    meta.clone(),
-                    hash_tokens.clone(),
-                    notifier.clone(),
-                    cancel.clone(),
-                    suspend.clone(),
-                );
-                let mut cx = Context::from_waker(&waker);
-                #[cfg(feature = "tracing")]
-                let _span = {
-                    let span = tracing::span!(
-                        tracing::Level::TRACE,
-                        "Job poll",
-                        id = id.to_string(),
-                        location = location.to_string(),
-                        context = context.to_string(),
-                        priority = priority.to_string(),
-                        thread_id = format!("{:?}", std::thread::current().id()),
-                    );
-                    if let Some(last) = tracing_span.take() {
-                        span.follows_from(last);
-                    }
-                    span.entered()
-                };
-                let poll_result = job.poll(
-                    &mut cx,
-                    #[cfg(debug_assertions)]
-                    &creation_backtrace,
-                );
-                (poll_result, receiver)
-            };
-            if let Some(job) = poll_result {
-                let mut move_to = None;
-                for command in receiver.try_iter() {
-                    notify_workers = true;
-                    match command {
-                        JobsWakerCommand::MoveTo(location) => move_to = Some(location),
-                        JobsWakerCommand::ChangePriority(new_priority) => {
-                            priority = new_priority;
-                        }
-                    }
-                }
-                match move_to {
-                    Some(JobLocation::Queue(q)) => {
-                        q.enqueue(JobObject {
-                            id,
-                            job,
-                            context,
-                            location,
-                            priority,
-                            cancel,
-                            suspend,
-                            meta,
-                            #[cfg(debug_assertions)]
-                            creation_backtrace,
-                            #[cfg(feature = "tracing")]
-                            tracing_span,
-                        });
-                    }
-                    Some(location) => pending.push(JobObject {
-                        id,
-                        job,
-                        context,
-                        location,
-                        priority,
-                        cancel,
-                        suspend,
-                        meta,
-                        #[cfg(debug_assertions)]
-                        creation_backtrace,
-                        #[cfg(feature = "tracing")]
-                        tracing_span,
-                    }),
-                    None => pending.push(JobObject {
-                        id,
-                        job,
-                        context,
-                        location,
-                        priority,
-                        cancel,
-                        suspend,
-                        meta,
-                        #[cfg(debug_assertions)]
-                        creation_backtrace,
-                        #[cfg(feature = "tracing")]
-                        tracing_span,
-                    }),
-                }
-            }
-            if notify_workers {
-                notifier.notify();
-            }
-            if timer.elapsed() >= timeout {
-                break;
-            }
-        }
-        self.extend(pending);
-    }
-
-    pub fn spawn<T: Send + 'static>(
-        &self,
-        options: impl Into<JobOptions>,
-        job: impl Future<Output = T> + Send + Sync + 'static,
-    ) -> JobHandle<T> {
-        let options = options.into();
-        let handle = JobHandle::<T>::default().with_meta(options.meta);
-        let handle2 = handle.clone();
-        let job = Job(Box::pin(async move {
-            handle2.put(job.await);
-        }));
-        self.schedule(options.location, options.priority, handle, job)
-    }
-
-    pub fn spawn_closure<T: Send + 'static>(
-        &self,
-        options: impl Into<JobOptions>,
-        job: impl FnOnce(JobContext) -> T + Send + Sync + 'static,
-    ) -> JobHandle<T> {
-        let options = options.into();
-        let handle = JobHandle::<T>::default().with_meta(options.meta);
-        let handle2 = handle.clone();
-        let job = Job(Box::pin(async move {
-            handle2.put(job(context().await));
-        }));
-        self.schedule(options.location, options.priority, handle, job)
-    }
-
-    fn schedule<T: Send + 'static>(
-        &self,
-        location: JobLocation,
-        priority: JobPriority,
-        handle: JobHandle<T>,
-        job: Job,
-    ) -> JobHandle<T> {
-        #[cfg(debug_assertions)]
-        let creation_backtrace = std::backtrace::Backtrace::capture().to_string();
-        self.enqueue(JobObject {
-            id: ID::new(),
-            job,
-            context: JobContext {
-                work_group_index: 0,
-                work_groups_count: 1,
-            },
-            location,
-            priority,
-            cancel: handle.cancel.clone(),
-            suspend: handle.suspend.clone(),
-            meta: handle.meta.clone(),
-            #[cfg(debug_assertions)]
-            creation_backtrace,
-            #[cfg(feature = "tracing")]
-            tracing_span: None,
-        });
-        handle
-    }
-
-    pub(crate) fn enqueue(&self, object: JobObject) {
-        if let Ok(mut queue) = self.queue.write() {
-            if object.priority == JobPriority::High {
-                queue.push_front(object);
-            } else {
-                queue.push_back(object);
-            }
-        }
-    }
-
-    fn dequeue(&self, target_location: &JobLocation, ignore_location: bool) -> Option<JobObject> {
-        let mut queue = self.queue.write().ok()?;
-        let mut extract = queue.extract_if(|object| {
-            if ignore_location || object.location == JobLocation::Exclusive {
-                true
-            } else {
-                match (&object.location, target_location) {
-                    (JobLocation::Local, JobLocation::Local)
-                    | (JobLocation::UnnamedWorker, JobLocation::UnnamedWorker) => true,
-                    (JobLocation::NamedWorker(a), JobLocation::NamedWorker(b)) if a == b => true,
-                    (JobLocation::ExactThread(a), _) => *a == std::thread::current().id(),
-                    (JobLocation::OtherThanThread(a), _) => *a != std::thread::current().id(),
-                    (JobLocation::NonLocal, b) => b != &JobLocation::Local,
-                    (JobLocation::Queue(q), _) => q == self,
-                    (JobLocation::Unknown, _) => true,
-                    _ => false,
-                }
-            }
-        });
-        extract.next()
-    }
-
-    fn extend(&self, queue: impl IntoIterator<Item = JobObject>) {
-        if let Ok(mut current_queue) = self.queue.write() {
-            for object in queue {
-                if object.priority == JobPriority::High {
-                    current_queue.push_front(object);
-                } else {
-                    current_queue.push_back(object);
-                }
-            }
+impl JobsMetaValue {
+    pub fn lazy(&self) -> DynamicManagedLazy {
+        match self {
+            JobsMetaValue::Boxed(boxed) => boxed.lazy(),
+            JobsMetaValue::Lazy(lazy) => lazy.clone(),
         }
     }
 }
 
-impl Future for JobQueue {
-    type Output = ();
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if self.is_empty() {
-            cx.waker().wake_by_ref();
-            Poll::Pending
-        } else {
-            cx.waker().wake_by_ref();
-            Poll::Ready(())
-        }
+impl From<DynamicManagedBox> for JobsMetaValue {
+    fn from(value: DynamicManagedBox) -> Self {
+        JobsMetaValue::Boxed(value)
     }
 }
 
-impl PartialEq for JobQueue {
-    fn eq(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.queue, &other.queue)
-    }
-}
-
-impl std::fmt::Debug for JobQueue {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("JobQueue")
-            .field("len", &self.len())
-            .finish()
+impl From<DynamicManagedLazy> for JobsMetaValue {
+    fn from(value: DynamicManagedLazy) -> Self {
+        JobsMetaValue::Lazy(value)
     }
 }
 
 #[derive(Default, Clone)]
 pub struct JobsMeta {
-    meta: Arc<RwLock<HashMap<String, DynamicManagedLazy>>>,
+    meta: Arc<RwLock<HashMap<Cow<'static, str>, JobsMetaValue>>>,
 }
 
 impl JobsMeta {
-    pub fn with(self, name: impl ToString, value: DynamicManagedLazy) -> Self {
+    pub fn with(self, name: impl Into<Cow<'static, str>>, value: impl Into<JobsMetaValue>) -> Self {
         if let Ok(mut meta) = self.meta.write() {
-            meta.insert(name.to_string(), value);
+            meta.insert(name.into(), value.into());
         }
         self
     }
 
-    pub fn with_many(self, iter: impl IntoIterator<Item = (String, DynamicManagedLazy)>) -> Self {
+    pub fn with_many(
+        self,
+        iter: impl IntoIterator<Item = (Cow<'static, str>, JobsMetaValue)>,
+    ) -> Self {
         if let Ok(mut meta) = self.meta.write() {
             meta.extend(iter);
         }
         self
     }
 
-    pub fn set(&self, name: impl ToString, value: DynamicManagedLazy) {
+    pub fn set(&self, name: impl Into<Cow<'static, str>>, value: impl Into<JobsMetaValue>) {
         if let Ok(mut meta) = self.meta.write() {
-            meta.insert(name.to_string(), value);
+            meta.insert(name.into(), value.into());
+        }
+    }
+
+    pub fn set_many(&self, iter: impl IntoIterator<Item = (Cow<'static, str>, JobsMetaValue)>) {
+        if let Ok(mut meta) = self.meta.write() {
+            meta.extend(iter);
         }
     }
 
@@ -884,7 +158,31 @@ impl JobsMeta {
         self.meta
             .read()
             .ok()
-            .and_then(|meta| meta.get(name).cloned())
+            .and_then(|meta| meta.get(name).map(|meta| meta.lazy()))
+    }
+}
+
+impl FromIterator<(Cow<'static, str>, JobsMetaValue)> for JobsMeta {
+    fn from_iter<T: IntoIterator<Item = (Cow<'static, str>, JobsMetaValue)>>(iter: T) -> Self {
+        let mut meta = HashMap::new();
+        for (name, value) in iter {
+            meta.insert(name, value);
+        }
+        JobsMeta {
+            meta: Arc::new(RwLock::new(meta)),
+        }
+    }
+}
+
+impl IntoIterator for JobsMeta {
+    type Item = (Cow<'static, str>, JobsMetaValue);
+    type IntoIter = std::collections::hash_map::IntoIter<Cow<'static, str>, JobsMetaValue>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        match Arc::try_unwrap(self.meta) {
+            Ok(rwlock) => rwlock.into_inner().unwrap().into_iter(),
+            Err(arc) => arc.read().unwrap().clone().into_iter(),
+        }
     }
 }
 
@@ -997,141 +295,18 @@ impl Worker {
                 return;
             }
             while let Some(object) = queue.dequeue(&worker_location, false) {
-                if object.location == JobLocation::Exclusive {
-                    Self::exclusive(
-                        object,
-                        queue.clone(),
-                        global_meta.clone(),
-                        Default::default(),
-                        hash_tokens.clone(),
-                        notifier.clone(),
-                    );
-                    continue;
-                }
-                let JobObject {
-                    id,
-                    job,
-                    context,
-                    location,
-                    mut priority,
-                    cancel,
-                    suspend,
-                    meta,
-                    #[cfg(debug_assertions)]
-                    creation_backtrace,
-                    #[cfg(feature = "tracing")]
-                    mut tracing_span,
-                } = object;
-                let mut notify_workers = false;
-                let (poll_result, receiver) = if cancel.load(Ordering::Relaxed) {
-                    let (_, rx) = std::sync::mpsc::channel();
-                    (None, rx)
-                } else if suspend.load(Ordering::Relaxed) {
-                    let (_, rx) = std::sync::mpsc::channel();
-                    (Some(job), rx)
-                } else {
-                    let (waker, receiver) = JobsWaker::new_waker(
-                        queue.clone(),
-                        location.clone(),
-                        context,
-                        priority,
-                        global_meta.clone(),
-                        worker_meta.clone(),
-                        meta.clone(),
-                        hash_tokens.clone(),
-                        notifier.clone(),
-                        cancel.clone(),
-                        suspend.clone(),
-                    );
-                    let mut cx = Context::from_waker(&waker);
-                    #[cfg(feature = "tracing")]
-                    let _span = {
-                        let span = tracing::span!(
-                            tracing::Level::TRACE,
-                            "Job poll",
-                            id = id.to_string(),
-                            location = location.to_string(),
-                            context = context.to_string(),
-                            priority = priority.to_string(),
-                            thread_id = format!("{:?}", std::thread::current().id()),
-                        );
-                        if let Some(last) = tracing_span.take() {
-                            span.follows_from(last);
-                        }
-                        span.entered()
-                    };
-                    let poll_result = job.poll(
-                        &mut cx,
-                        #[cfg(debug_assertions)]
-                        &creation_backtrace,
-                    );
-                    (poll_result, receiver)
-                };
-                if let Some(job) = poll_result {
-                    let mut move_to = None;
-                    for command in receiver.try_iter() {
-                        notify_workers = true;
-                        match command {
-                            JobsWakerCommand::MoveTo(location) => {
-                                move_to = Some(location);
-                            }
-                            JobsWakerCommand::ChangePriority(new_priority) => {
-                                priority = new_priority;
-                            }
-                        }
-                    }
-                    match move_to {
-                        Some(JobLocation::Queue(q)) => {
-                            q.enqueue(JobObject {
-                                id,
-                                job,
-                                context,
-                                location,
-                                priority,
-                                cancel,
-                                suspend,
-                                meta,
-                                #[cfg(debug_assertions)]
-                                creation_backtrace,
-                                #[cfg(feature = "tracing")]
-                                tracing_span,
-                            });
-                        }
-                        Some(location) => pending.push(JobObject {
-                            id,
-                            job,
-                            context,
-                            location,
-                            priority,
-                            cancel,
-                            suspend,
-                            meta,
-                            #[cfg(debug_assertions)]
-                            creation_backtrace,
-                            #[cfg(feature = "tracing")]
-                            tracing_span,
-                        }),
-                        None => pending.push(JobObject {
-                            id,
-                            job,
-                            context,
-                            location,
-                            priority,
-                            cancel,
-                            suspend,
-                            meta,
-                            #[cfg(debug_assertions)]
-                            creation_backtrace,
-                            #[cfg(feature = "tracing")]
-                            tracing_span,
-                        }),
-                    }
+                if let Some(object) = queue.poll_once(
+                    object,
+                    global_meta.clone(),
+                    worker_meta.clone(),
+                    hash_tokens.clone(),
+                    notifier.clone(),
+                    true,
+                ) {
+                    pending.push(object);
                 }
                 if terminate.load(Ordering::Relaxed) {
                     return;
-                }
-                if notify_workers {
-                    notifier.notify();
                 }
             }
             queue.extend(pending.drain(..));
@@ -1142,13 +317,13 @@ impl Worker {
         }
     }
 
-    fn exclusive(
+    pub(crate) fn exclusive(
         job: JobObject,
         queue: JobQueue,
         global_meta: JobsMeta,
         worker_meta: JobsMeta,
         hash_tokens: JobTokens,
-        notify: WorkerNotifier,
+        notifier: WorkerNotifier,
     ) -> JoinHandle<()> {
         spawn(move || {
             let mut pending = Some(job);
@@ -1156,150 +331,246 @@ impl Worker {
                 let Some(object) = pending.take() else {
                     return;
                 };
-                let JobObject {
-                    id,
-                    job,
-                    context,
-                    location,
-                    mut priority,
-                    cancel,
-                    suspend,
-                    meta,
-                    #[cfg(debug_assertions)]
-                    creation_backtrace,
-                    #[cfg(feature = "tracing")]
-                    mut tracing_span,
-                } = object;
-                let (poll_result, receiver) = if cancel.load(Ordering::Relaxed) {
-                    let (_, rx) = std::sync::mpsc::channel();
-                    (None, rx)
-                } else if suspend.load(Ordering::Relaxed) {
-                    let (_, rx) = std::sync::mpsc::channel();
-                    (Some(job), rx)
-                } else {
-                    let (waker, receiver) = JobsWaker::new_waker(
-                        queue.clone(),
-                        location.clone(),
-                        context,
-                        priority,
-                        global_meta.clone(),
-                        worker_meta.clone(),
-                        meta.clone(),
-                        hash_tokens.clone(),
-                        notify.clone(),
-                        cancel.clone(),
-                        suspend.clone(),
-                    );
-                    let mut cx = Context::from_waker(&waker);
-                    #[cfg(feature = "tracing")]
-                    let _span = {
-                        let span = tracing::span!(
-                            tracing::Level::TRACE,
-                            "Job poll",
-                            id = id.to_string(),
-                            location = location.to_string(),
-                            context = context.to_string(),
-                            priority = priority.to_string(),
-                            thread_id = format!("{:?}", std::thread::current().id()),
-                        );
-                        if let Some(last) = tracing_span.take() {
-                            span.follows_from(last);
-                        }
-                        span.entered()
-                    };
-                    let poll_result = job.poll(
-                        &mut cx,
-                        #[cfg(debug_assertions)]
-                        &creation_backtrace,
-                    );
-                    (poll_result, receiver)
-                };
-                if let Some(job) = poll_result {
-                    let mut move_to = None;
-                    for command in receiver.try_iter() {
-                        match command {
-                            JobsWakerCommand::MoveTo(location) => {
-                                move_to = Some(location);
-                            }
-                            JobsWakerCommand::ChangePriority(new_priority) => {
-                                priority = new_priority;
-                            }
-                        }
-                    }
-                    match move_to {
-                        Some(JobLocation::Queue(q)) => {
-                            q.enqueue(JobObject {
-                                id,
-                                job,
-                                context,
-                                location,
-                                priority,
-                                cancel,
-                                suspend,
-                                meta,
-                                #[cfg(debug_assertions)]
-                                creation_backtrace,
-                                #[cfg(feature = "tracing")]
-                                tracing_span,
-                            });
-                        }
-                        Some(location) => {
-                            queue.enqueue(JobObject {
-                                id,
-                                job,
-                                context,
-                                location,
-                                priority,
-                                cancel,
-                                suspend,
-                                meta,
-                                #[cfg(debug_assertions)]
-                                creation_backtrace,
-                                #[cfg(feature = "tracing")]
-                                tracing_span,
-                            });
-                        }
-                        None => {
-                            pending = Some(JobObject {
-                                id,
-                                job,
-                                context,
-                                location,
-                                priority,
-                                cancel,
-                                suspend,
-                                meta,
-                                #[cfg(debug_assertions)]
-                                creation_backtrace,
-                                #[cfg(feature = "tracing")]
-                                tracing_span,
-                            });
-                        }
-                    }
-                }
+                pending = queue.poll_once(
+                    object,
+                    global_meta.clone(),
+                    worker_meta.clone(),
+                    hash_tokens.clone(),
+                    notifier.clone(),
+                    false,
+                );
             }
         })
     }
 }
 
-pub(crate) enum JobsWakerCommand {
+pub enum JobsWakerCommand {
     MoveTo(JobLocation),
     ChangePriority(JobPriority),
 }
 
-pub(crate) struct JobsWaker {
+thread_local! {
+    pub static CURRENT_RUNTIME: RefCell<Vec<JobsRuntime>> = Default::default();
+}
+
+pub struct JobsRuntimeGuard;
+
+impl Drop for JobsRuntimeGuard {
+    fn drop(&mut self) {
+        CURRENT_RUNTIME.with(|cell| {
+            let mut stack = cell.borrow_mut();
+            stack.pop();
+        });
+    }
+}
+
+#[derive(Default, Clone)]
+pub struct JobsRuntime {
+    pub queue: JobQueue,
+    pub location: JobLocation,
+    pub context: JobContext,
+    pub priority: JobPriority,
+    pub global_meta: JobsMeta,
+    pub worker_meta: JobsMeta,
+    pub local_meta: JobsMeta,
+    pub tags: JobsTags,
+    pub hash_tokens: JobTokens,
+    pub notify: WorkerNotifier,
+    pub cancel: Arc<AtomicBool>,
+    pub suspend: Arc<AtomicBool>,
+}
+
+impl JobsRuntime {
+    #[must_use = "Guard must be held to keep the runtime active for duration of a scope"]
+    pub fn enter(self) -> JobsRuntimeGuard {
+        CURRENT_RUNTIME.with(|cell| {
+            let mut stack = cell.borrow_mut();
+            stack.push(self);
+        });
+        JobsRuntimeGuard
+    }
+
+    pub fn try_current() -> Option<JobsRuntime> {
+        CURRENT_RUNTIME.with(|cell| {
+            let stack = cell.borrow();
+            stack.last().cloned()
+        })
+    }
+
+    pub fn current() -> JobsRuntime {
+        Self::try_current()
+            .unwrap_or_else(|| panic!("There is no active JobsRuntime in the current scope"))
+    }
+
+    pub fn queue(mut self, queue: JobQueue) -> Self {
+        self.queue = queue;
+        self
+    }
+
+    pub fn location(mut self, location: JobLocation) -> Self {
+        self.location = location;
+        self
+    }
+
+    pub fn context(mut self, context: JobContext) -> Self {
+        self.context = context;
+        self
+    }
+
+    pub fn priority(mut self, priority: JobPriority) -> Self {
+        self.priority = priority;
+        self
+    }
+
+    pub fn global_meta(mut self, global_meta: JobsMeta) -> Self {
+        self.global_meta = global_meta;
+        self
+    }
+
+    pub fn worker_meta(mut self, worker_meta: JobsMeta) -> Self {
+        self.worker_meta = worker_meta;
+        self
+    }
+
+    pub fn local_meta(mut self, local_meta: JobsMeta) -> Self {
+        self.local_meta = local_meta;
+        self
+    }
+
+    pub fn tags(mut self, tags: JobsTags) -> Self {
+        self.tags = tags;
+        self
+    }
+
+    pub fn hash_tokens(mut self, hash_tokens: JobTokens) -> Self {
+        self.hash_tokens = hash_tokens;
+        self
+    }
+
+    pub fn notify(mut self, notify: WorkerNotifier) -> Self {
+        self.notify = notify;
+        self
+    }
+
+    pub fn cancel(mut self, cancel: Arc<AtomicBool>) -> Self {
+        self.cancel = cancel;
+        self
+    }
+
+    pub fn suspend(mut self, suspend: Arc<AtomicBool>) -> Self {
+        self.suspend = suspend;
+        self
+    }
+
+    pub fn into_waker(self) -> (Waker, Receiver<JobsWakerCommand>) {
+        JobsWaker::make(self)
+    }
+
+    pub fn poll_future<F: Future>(self, future: Pin<&mut F>) -> Poll<F::Output> {
+        let (waker, _) = self.into_waker();
+        let mut cx = Context::from_waker(&waker);
+        future.poll(&mut cx)
+    }
+
+    pub fn block_on<F: Future>(&self, future: F) -> F::Output {
+        let mut future = pin!(future);
+        loop {
+            match self.clone().poll_future(future.as_mut()) {
+                Poll::Ready(value) => return value,
+                Poll::Pending => {}
+            }
+        }
+    }
+
+    pub async fn enable<F: Future>(&self, future: F) -> F::Output {
+        let mut future = pin!(future);
+        poll_fn(move |cx| {
+            let result = self.clone().poll_future(future.as_mut());
+            cx.waker().wake_by_ref();
+            result
+        })
+        .await
+    }
+
+    pub fn run_queue(&self, queue: &JobQueue) {
+        queue.run(
+            JobLocation::Unknown,
+            true,
+            Duration::MAX,
+            self.global_meta.clone(),
+            Default::default(),
+            self.hash_tokens.clone(),
+            self.notify.clone(),
+        );
+    }
+
+    pub fn run_queue_with_meta(&self, queue: &JobQueue, worker_meta: JobsMeta) {
+        queue.run(
+            JobLocation::Unknown,
+            true,
+            Duration::MAX,
+            self.global_meta.clone(),
+            worker_meta,
+            self.hash_tokens.clone(),
+            self.notify.clone(),
+        );
+    }
+
+    pub fn run_queue_timeout(&self, queue: &JobQueue, timeout: Duration) {
+        queue.run(
+            JobLocation::Unknown,
+            true,
+            timeout,
+            self.global_meta.clone(),
+            Default::default(),
+            self.hash_tokens.clone(),
+            self.notify.clone(),
+        );
+    }
+
+    pub fn run_queue_timeout_with_meta(
+        &self,
+        queue: &JobQueue,
+        timeout: Duration,
+        worker_meta: JobsMeta,
+    ) {
+        queue.run(
+            JobLocation::Unknown,
+            true,
+            timeout,
+            self.global_meta.clone(),
+            worker_meta,
+            self.hash_tokens.clone(),
+            self.notify.clone(),
+        );
+    }
+
+    pub fn get_meta(&self, name: &str) -> Option<DynamicManagedLazy> {
+        self.local_meta
+            .meta
+            .read()
+            .ok()
+            .and_then(|meta| meta.get(name).map(|meta| meta.lazy()))
+            .or_else(|| {
+                self.worker_meta
+                    .meta
+                    .read()
+                    .ok()
+                    .and_then(|meta| meta.get(name).map(|meta| meta.lazy()))
+                    .or_else(|| {
+                        self.global_meta
+                            .meta
+                            .read()
+                            .ok()
+                            .and_then(|meta| meta.get(name).map(|meta| meta.lazy()))
+                    })
+            })
+    }
+}
+
+pub struct JobsWaker {
     sender: Sender<JobsWakerCommand>,
-    queue: JobQueue,
-    location: JobLocation,
-    context: JobContext,
-    priority: JobPriority,
-    global_meta: JobsMeta,
-    worker_meta: JobsMeta,
-    local_meta: JobsMeta,
-    hash_tokens: JobTokens,
-    notify: WorkerNotifier,
-    cancel: Arc<AtomicBool>,
-    pub(crate) suspend: Arc<AtomicBool>,
+    pub(crate) runtime: JobsRuntime,
 }
 
 static JOBS_WAKER_VTABLE: RawWakerVTable = RawWakerVTable::new(
@@ -1321,35 +592,9 @@ impl JobsWaker {
         let _ = unsafe { Arc::from_raw(data as *const Self) };
     }
 
-    #[allow(clippy::too_many_arguments)]
-    pub fn new_waker(
-        queue: JobQueue,
-        location: JobLocation,
-        context: JobContext,
-        priority: JobPriority,
-        global_meta: JobsMeta,
-        worker_meta: JobsMeta,
-        local_meta: JobsMeta,
-        hash_tokens: JobTokens,
-        notify: WorkerNotifier,
-        cancel: Arc<AtomicBool>,
-        suspend: Arc<AtomicBool>,
-    ) -> (Waker, Receiver<JobsWakerCommand>) {
+    pub fn make(runtime: JobsRuntime) -> (Waker, Receiver<JobsWakerCommand>) {
         let (sender, receiver) = std::sync::mpsc::channel();
-        let arc = Arc::new(Self {
-            sender,
-            queue,
-            location,
-            context,
-            priority,
-            global_meta,
-            worker_meta,
-            local_meta,
-            hash_tokens,
-            notify,
-            cancel,
-            suspend,
-        });
+        let arc = Arc::new(Self { sender, runtime });
         let raw = RawWaker::new(Arc::into_raw(arc) as *const (), &JOBS_WAKER_VTABLE);
         (unsafe { Waker::from_raw(raw) }, receiver)
     }
@@ -1362,165 +607,18 @@ impl JobsWaker {
         }
     }
 
-    pub fn command(&self, command: JobsWakerCommand) {
+    /// # Safety
+    pub unsafe fn runtime(&self) -> &JobsRuntime {
+        &self.runtime
+    }
+
+    /// # Safety
+    pub unsafe fn runtime_mut(&mut self) -> &mut JobsRuntime {
+        &mut self.runtime
+    }
+
+    pub(crate) fn command(&self, command: JobsWakerCommand) {
         let _ = self.sender.send(command);
-    }
-
-    pub fn enqueue(&self, object: JobObject) {
-        self.queue.enqueue(object);
-    }
-
-    pub fn queue(&self) -> JobQueue {
-        self.queue.clone()
-    }
-
-    pub fn location(&self) -> JobLocation {
-        self.location.clone()
-    }
-
-    pub fn context(&self) -> JobContext {
-        self.context
-    }
-
-    pub fn priority(&self) -> JobPriority {
-        self.priority
-    }
-
-    pub fn run_queue(&self, queue: &JobQueue) {
-        queue.run(
-            JobLocation::Unknown,
-            true,
-            Duration::MAX,
-            self.global_meta.clone(),
-            [],
-            self.hash_tokens.clone(),
-            self.notify.clone(),
-        );
-    }
-
-    pub fn run_queue_with_meta(
-        &self,
-        queue: &JobQueue,
-        worker_meta: impl IntoIterator<Item = (String, DynamicManagedLazy)>,
-    ) {
-        queue.run(
-            JobLocation::Unknown,
-            true,
-            Duration::MAX,
-            self.global_meta.clone(),
-            worker_meta,
-            self.hash_tokens.clone(),
-            self.notify.clone(),
-        );
-    }
-
-    pub fn run_queue_timeout(&self, queue: &JobQueue, timeout: Duration) {
-        queue.run(
-            JobLocation::Unknown,
-            true,
-            timeout,
-            self.global_meta.clone(),
-            [],
-            self.hash_tokens.clone(),
-            self.notify.clone(),
-        );
-    }
-
-    pub fn run_queue_timeout_with_meta(
-        &self,
-        queue: &JobQueue,
-        timeout: Duration,
-        worker_meta: impl IntoIterator<Item = (String, DynamicManagedLazy)>,
-    ) {
-        queue.run(
-            JobLocation::Unknown,
-            true,
-            timeout,
-            self.global_meta.clone(),
-            worker_meta,
-            self.hash_tokens.clone(),
-            self.notify.clone(),
-        );
-    }
-
-    pub fn get_meta(&self, name: &str) -> Option<DynamicManagedLazy> {
-        self.local_meta
-            .meta
-            .read()
-            .ok()
-            .and_then(|meta| meta.get(name).cloned())
-            .or_else(|| {
-                self.worker_meta
-                    .meta
-                    .read()
-                    .ok()
-                    .and_then(|meta| meta.get(name).cloned())
-                    .or_else(|| {
-                        self.global_meta
-                            .meta
-                            .read()
-                            .ok()
-                            .and_then(|meta| meta.get(name).cloned())
-                    })
-            })
-    }
-
-    pub fn local_meta(&self) -> JobsMeta {
-        self.local_meta.clone()
-    }
-
-    pub fn cancel(&self) -> Arc<AtomicBool> {
-        self.cancel.clone()
-    }
-
-    pub fn suspend(&self) -> Arc<AtomicBool> {
-        self.suspend.clone()
-    }
-
-    pub fn acquire_token<T: Hash>(&self, subject: &T) -> Option<JobToken> {
-        let mut hasher = DefaultHasher::new();
-        subject.hash(&mut hasher);
-        let hash = hasher.finish();
-        let Ok(mut hash_tokens) = self.hash_tokens.hash_tokens.lock() else {
-            return None;
-        };
-        if hash_tokens.contains(&hash) {
-            None
-        } else {
-            hash_tokens.insert(hash);
-            Some(JobToken {
-                hash_tokens: self.hash_tokens.clone(),
-                hash,
-            })
-        }
-    }
-
-    pub fn acquire_token_timeout<T: Hash>(
-        &self,
-        subject: &T,
-        timeout: Duration,
-    ) -> Option<JobToken> {
-        let mut hasher = DefaultHasher::new();
-        subject.hash(&mut hasher);
-        let hash = hasher.finish();
-        let timer = Instant::now();
-        while timer.elapsed() < timeout {
-            let Ok(mut hash_tokens) = self.hash_tokens.hash_tokens.try_lock() else {
-                traced_spin_loop();
-                continue;
-            };
-            if hash_tokens.contains(&hash) {
-                traced_spin_loop();
-                continue;
-            } else {
-                hash_tokens.insert(hash);
-                return Some(JobToken {
-                    hash_tokens: self.hash_tokens.clone(),
-                    hash,
-                });
-            }
-        }
-        None
     }
 }
 
@@ -1580,6 +678,11 @@ impl Jobs {
         }
     }
 
+    pub fn catch_panics(self) -> Self {
+        self.queue.set_catch_panics(true);
+        self
+    }
+
     pub fn with_unnamed_worker(mut self, iteration_timeout: Duration) -> Self {
         self.add_unnamed_worker(iteration_timeout);
         self
@@ -1591,41 +694,37 @@ impl Jobs {
     }
 
     pub fn add_unnamed_worker(&mut self, iteration_timeout: Duration) {
-        self.add_unnamed_worker_with_meta(iteration_timeout, []);
+        self.add_unnamed_worker_with_meta(iteration_timeout, Default::default());
     }
 
-    pub fn add_unnamed_worker_with_meta(
-        &mut self,
-        iteration_timeout: Duration,
-        meta: impl IntoIterator<Item = (String, DynamicManagedLazy)>,
-    ) {
+    pub fn add_unnamed_worker_with_meta(&mut self, iteration_timeout: Duration, meta: JobsMeta) {
         self.workers.push(Worker::new(
             iteration_timeout,
             JobLocation::UnnamedWorker,
             self.queue.clone(),
             self.meta.clone(),
-            JobsMeta::default().with_many(meta),
+            meta,
             self.hash_tokens.clone(),
             self.notifier.clone(),
         ));
     }
 
     pub fn add_named_worker(&mut self, iteration_timeout: Duration, name: impl ToString) {
-        self.add_named_worker_with_meta(iteration_timeout, name, []);
+        self.add_named_worker_with_meta(iteration_timeout, name, Default::default());
     }
 
     pub fn add_named_worker_with_meta(
         &mut self,
         iteration_timeout: Duration,
         name: impl ToString,
-        meta: impl IntoIterator<Item = (String, DynamicManagedLazy)>,
+        meta: JobsMeta,
     ) {
         self.workers.push(Worker::new(
             iteration_timeout,
             JobLocation::named_worker(name),
             self.queue.clone(),
             self.meta.clone(),
-            JobsMeta::default().with_many(meta),
+            meta,
             self.hash_tokens.clone(),
             self.notifier.clone(),
         ));
@@ -1660,7 +759,7 @@ impl Jobs {
         })
     }
 
-    pub fn set_meta(&self, name: impl ToString, value: DynamicManagedLazy) {
+    pub fn set_meta(&self, name: impl Into<Cow<'static, str>>, value: DynamicManagedLazy) {
         self.meta.set(name, value);
     }
 
@@ -1674,14 +773,31 @@ impl Jobs {
         };
         meta.get(name)
             .cloned()
-            .and_then(|value| value.into_typed::<T>().ok())
+            .and_then(|value| value.lazy().into_typed::<T>().ok())
     }
 
     pub fn get_meta_dynamic(&self, name: &str) -> Option<DynamicManagedLazy> {
         let Ok(meta) = self.meta.meta.read() else {
             return None;
         };
-        meta.get(name).cloned()
+        meta.get(name).map(|meta| meta.lazy())
+    }
+
+    pub fn runtime(&self) -> JobsRuntime {
+        JobsRuntime {
+            queue: self.queue.clone(),
+            location: JobLocation::Local,
+            context: Default::default(),
+            priority: JobPriority::Normal,
+            global_meta: self.meta.clone(),
+            worker_meta: JobsMeta::default(),
+            local_meta: JobsMeta::default(),
+            tags: JobsTags::default(),
+            hash_tokens: self.hash_tokens.clone(),
+            notify: self.notifier.clone(),
+            cancel: Arc::new(AtomicBool::default()),
+            suspend: Arc::new(AtomicBool::default()),
+        }
     }
 
     pub fn run_local(&self) {
@@ -1690,16 +806,13 @@ impl Jobs {
             self.workers.is_empty(),
             Duration::MAX,
             self.meta.clone(),
-            [],
+            Default::default(),
             self.hash_tokens.clone(),
             self.notifier.clone(),
         );
     }
 
-    pub fn run_local_with_meta(
-        &self,
-        worker_meta: impl IntoIterator<Item = (String, DynamicManagedLazy)>,
-    ) {
+    pub fn run_local_with_meta(&self, worker_meta: JobsMeta) {
         self.queue.run(
             JobLocation::Local,
             self.workers.is_empty(),
@@ -1717,17 +830,13 @@ impl Jobs {
             self.workers.is_empty(),
             timeout,
             self.meta.clone(),
-            [],
+            Default::default(),
             self.hash_tokens.clone(),
             self.notifier.clone(),
         );
     }
 
-    pub fn run_local_timeout_with_meta(
-        &self,
-        timeout: Duration,
-        worker_meta: impl IntoIterator<Item = (String, DynamicManagedLazy)>,
-    ) {
+    pub fn run_local_timeout_with_meta(&self, timeout: Duration, worker_meta: JobsMeta) {
         self.queue.run(
             JobLocation::Local,
             self.workers.is_empty(),
@@ -1750,17 +859,13 @@ impl Jobs {
             true,
             Duration::MAX,
             self.meta.clone(),
-            [],
+            Default::default(),
             self.hash_tokens.clone(),
             self.notifier.clone(),
         );
     }
 
-    pub fn run_queue_with_meta(
-        &self,
-        queue: &JobQueue,
-        worker_meta: impl IntoIterator<Item = (String, DynamicManagedLazy)>,
-    ) {
+    pub fn run_queue_with_meta(&self, queue: &JobQueue, worker_meta: JobsMeta) {
         queue.run(
             JobLocation::Unknown,
             true,
@@ -1778,7 +883,7 @@ impl Jobs {
             true,
             timeout,
             self.meta.clone(),
-            [],
+            Default::default(),
             self.hash_tokens.clone(),
             self.notifier.clone(),
         );
@@ -1788,7 +893,7 @@ impl Jobs {
         &self,
         queue: &JobQueue,
         timeout: Duration,
-        worker_meta: impl IntoIterator<Item = (String, DynamicManagedLazy)>,
+        worker_meta: JobsMeta,
     ) {
         queue.run(
             JobLocation::Unknown,
@@ -1824,22 +929,8 @@ impl Jobs {
     }
 
     #[inline]
-    pub fn queue_filter_count(
-        &self,
-        // fn(id, location, priority, is_cancelled, is_suspended) -> bool
-        f: impl Fn(ID<Jobs>, &JobLocation, &JobPriority, bool, bool) -> bool,
-    ) -> usize {
-        self.queue.filter_count(f)
-    }
-
-    #[inline]
-    pub fn queue_is_empty(&self) -> bool {
-        self.queue.is_empty()
-    }
-
-    #[inline]
-    pub fn queue_len(&self) -> usize {
-        self.queue.len()
+    pub fn queue(&self) -> &JobQueue {
+        &self.queue
     }
 
     pub fn spawn<T: Send + 'static>(
@@ -1888,10 +979,7 @@ impl Jobs {
         job: impl Fn(JobContext) -> T + Send + Sync + 'static,
     ) -> AllJobsHandle<T> {
         if work_groups == 0 || self.workers.is_empty() {
-            return AllJobsHandle::new(job(JobContext {
-                work_group_index: 0,
-                work_groups_count: 1,
-            }));
+            return AllJobsHandle::new(job(Default::default()));
         }
         let job = Arc::new(job);
         #[cfg(debug_assertions)]
@@ -1916,6 +1004,7 @@ impl Jobs {
                         cancel: handle.cancel.clone(),
                         suspend: handle.suspend.clone(),
                         meta: handle.meta.clone(),
+                        tags: Default::default(),
                         #[cfg(debug_assertions)]
                         creation_backtrace: creation_backtrace.clone(),
                         #[cfg(feature = "tracing")]
@@ -2018,9 +1107,12 @@ impl<'env, T: Send + 'static> ScopedJobs<'env, T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::coroutine::{
-        acquire_token, location, meta, move_to, on_exit, spawn, spawn_closure, suspend, wait_polls,
-        wait_time, with_all, with_any, yield_now,
+    use crate::{
+        coroutine::{
+            acquire_token, location, meta, move_to, on_exit, spawn, spawn_closure, suspend,
+            wait_polls, wait_time, with_all, with_any, yield_now,
+        },
+        job::JobResult,
     };
     use std::sync::atomic::AtomicUsize;
 
@@ -2048,7 +1140,7 @@ mod tests {
         while !job.is_done() {
             jobs.run_local();
         }
-        let result = job.try_take().unwrap().unwrap();
+        let result = job.take_result().unwrap();
         assert_eq!(result, 4950);
 
         let job = jobs.broadcast(move |ctx| ctx.work_group_index);
@@ -2081,7 +1173,7 @@ mod tests {
         while !job.is_done() {
             jobs.run_local();
         }
-        let result = job.try_take().unwrap().unwrap();
+        let result = job.take_result().unwrap();
         assert_eq!(result, 4950);
 
         let job = jobs.spawn_closure(JobLocation::Local, move |_| {
@@ -2091,7 +1183,7 @@ mod tests {
         while !job.is_done() {
             jobs.run_local();
         }
-        let result = job.try_take().unwrap().unwrap();
+        let result = job.take_result().unwrap();
         assert_eq!(result, 4950);
 
         let job = jobs.spawn_closure(JobLocation::UnnamedWorker, move |_| {
@@ -2101,7 +1193,7 @@ mod tests {
         while !job.is_done() {
             jobs.run_local();
         }
-        let result = job.try_take().unwrap().unwrap();
+        let result = job.take_result().unwrap();
         assert_eq!(result, 4950);
 
         let job = jobs.spawn_closure(JobLocation::named_worker("temp"), move |_| {
@@ -2111,7 +1203,7 @@ mod tests {
         while !job.is_done() {
             jobs.run_local();
         }
-        let result = job.try_take().unwrap().unwrap();
+        let result = job.take_result().unwrap();
         assert_eq!(result, 4950);
 
         let job = jobs.spawn_closure(JobLocation::current_thread(), move |_| {
@@ -2121,7 +1213,7 @@ mod tests {
         while !job.is_done() {
             jobs.run_local();
         }
-        let result = job.try_take().unwrap().unwrap();
+        let result = job.take_result().unwrap();
         assert_eq!(result, 4950);
 
         let job = jobs.spawn_closure(JobLocation::other_than_current_thread(), move |_| {
@@ -2131,7 +1223,7 @@ mod tests {
         while !job.is_done() {
             jobs.run_local();
         }
-        let result = job.try_take().unwrap().unwrap();
+        let result = job.take_result().unwrap();
         assert_eq!(result, 4950);
 
         let job = jobs.broadcast(move |_| 1);
@@ -2162,7 +1254,7 @@ mod tests {
         while !job.is_done() {
             jobs.run_queue(&queue);
         }
-        let result = job.try_take().unwrap().unwrap();
+        let result = job.take_result().unwrap();
         assert_eq!(result, 4950);
     }
 
@@ -2216,7 +1308,7 @@ mod tests {
         while !job.is_done() {
             jobs.run_local();
         }
-        let result = job.try_take().unwrap().unwrap();
+        let result = job.take_result().unwrap();
         assert_eq!(result, 4950);
 
         let job = jobs.spawn((), async {
@@ -2319,7 +1411,7 @@ mod tests {
         while !job.is_done() {
             jobs.run_local();
         }
-        let result = job.try_take().unwrap().unwrap();
+        let result = job.take_result().unwrap();
         assert_eq!(result, 42);
     }
 
@@ -2366,7 +1458,7 @@ mod tests {
         while !job.is_done() {
             jobs.run_local();
         }
-        let result = job.try_take().unwrap().unwrap();
+        let result = job.take_result().unwrap();
         assert_eq!(result, 42);
     }
 
@@ -2403,9 +1495,13 @@ mod tests {
         });
 
         while !job.is_done() {
-            jobs.run_local_with_meta([("flag".to_owned(), flag_lazy.clone())]);
+            jobs.run_local_with_meta(
+                [("flag".into(), flag_lazy.clone().into())]
+                    .into_iter()
+                    .collect(),
+            );
         }
-        let result = job.try_take().unwrap().unwrap();
+        let result = job.take_result().unwrap();
         assert!(result);
     }
 
@@ -2514,7 +1610,7 @@ mod tests {
         while !job.is_done() {
             jobs.run_local();
         }
-        assert_eq!(job.try_take(), Some(None));
+        assert_eq!(job.take(), JobResult::Cancelled);
         assert!(!state.load(Ordering::SeqCst));
     }
 
@@ -2537,7 +1633,7 @@ mod tests {
         while !job.is_done() {
             jobs.run_local();
         }
-        let result = job.try_take().unwrap().unwrap();
+        let result = job.take_result().unwrap();
         assert_eq!(result, 42);
     }
 
@@ -2570,7 +1666,7 @@ mod tests {
 
     #[test]
     fn test_futures_panic() {
-        let jobs = Jobs::default();
+        let jobs = Jobs::default().catch_panics();
 
         let job = jobs.spawn(JobLocation::Local, async {
             println!("About to panic...");
@@ -2582,10 +1678,10 @@ mod tests {
             42
         });
 
-        while !jobs.queue_is_empty() {
+        while !jobs.queue().is_empty() {
             jobs.run_local();
         }
-        assert_eq!(job.try_take(), None);
+        assert_eq!(job.take(), JobResult::InProgress);
     }
 
     #[test]
