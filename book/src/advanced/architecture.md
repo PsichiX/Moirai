@@ -1,3 +1,0 @@
-# Architecture without hell
-
-> TODO

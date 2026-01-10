@@ -1,0 +1,2755 @@
+<!DOCTYPE HTML>
+<html lang="en" class="ayu sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Prompts - Moirai - Fearless game coroutines</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../../css/general-2459343d.css">
+        <link rel="stylesheet" href="../../css/chrome-ae938929.css">
+        <link rel="stylesheet" href="../../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../../";
+            const default_light_theme = "ayu";
+            const default_dark_theme = "ayu";
+            window.path_to_searchindex_js = "../../searchindex-10e9eeba.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../../toc-ced68be6.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('ayu')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Moirai - Fearless game coroutines</h1>
+
+                    <div class="right-buttons">
+                        <a href="../../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="prompts"><a class="header" href="#prompts">Prompts</a></h1>
+<p>Prompts are kinds of coroutines where we have to await on specific user input.</p>
+<p>Let’s remind ourselves the player turn:</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">use crossterm::{
+</span><span class="boring">    event::{Event, KeyCode},
+</span><span class="boring">    style::Stylize,
+</span><span class="boring">    terminal::size,
+</span><span class="boring">};
+</span><span class="boring">use moirai::{
+</span><span class="boring">    coroutine::{meta, spawn, wait_time, yield_now},
+</span><span class="boring">    job::JobLocation,
+</span><span class="boring">    jobs::Jobs,
+</span><span class="boring">    third_party::intuicio_data::{managed::DynamicManagedLazy, shared::AsyncShared},
+</span><span class="boring">};
+</span><span class="boring">use moirai_book_samples::{
+</span><span class="boring">    game::{Game, GameState, GameStateChange},
+</span><span class="boring">    terminal::Terminal,
+</span><span class="boring">    utils::{is_key_pressed, text_size, text_wrap},
+</span><span class="boring">};
+</span><span class="boring">use std::time::Duration;
+</span><span class="boring">
+</span><span class="boring">fn main() {
+</span><span class="boring">    Game::new(Jrpg::default()).run_blocking();
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">const EVENTS_META: &amp;str = "~events~";
+</span><span class="boring">const TURN_INDEX_META: &amp;str = "~turn-index~";
+</span><span class="boring">const SELECTED_ACTION_META: &amp;str = "~selected-action~";
+</span><span class="boring">const UI_SCREEN: &amp;str = "~ui-screen~";
+</span><span class="boring">const LOG_META: &amp;str = "~log~";
+</span><span class="boring">const STEP_DELAY: Duration = Duration::from_secs(1);
+</span><span class="boring">const HEALTH_CAPACITY: usize = 100;
+</span><span class="boring">const MANA_CAPACITY: usize = 100;
+</span><span class="boring">
+</span><span class="boring">struct Jrpg {
+</span><span class="boring">    terminal: Terminal,
+</span><span class="boring">    jobs: Jobs,
+</span><span class="boring">    turn_index: usize,
+</span><span class="boring">    ui_screen: Box&lt;dyn UiScreen&gt;,
+</span><span class="boring">    selected_action: Option&lt;Action&gt;,
+</span><span class="boring">    log: Vec&lt;String&gt;,
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl Default for Jrpg {
+</span><span class="boring">    fn default() -&gt; Self {
+</span><span class="boring">        let jobs = Jobs::default();
+</span><span class="boring">
+</span><span class="boring">        let player = AsyncShared::new(Character::new("Player"));
+</span><span class="boring">        let enemy = AsyncShared::new(Character::new("Enemy"));
+</span><span class="boring">
+</span><span class="boring">        jobs.queue()
+</span><span class="boring">            .spawn(JobLocation::Local, battle(player, enemy));
+</span><span class="boring">
+</span><span class="boring">        Self {
+</span><span class="boring">            terminal: Terminal::default(),
+</span><span class="boring">            jobs,
+</span><span class="boring">            turn_index: 0,
+</span><span class="boring">            ui_screen: Box::new(LogsScreen),
+</span><span class="boring">            selected_action: None,
+</span><span class="boring">            log: Default::default(),
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl GameState for Jrpg {
+</span><span class="boring">    fn frame(&amp;mut self, _delta_time: Duration) -&gt; GameStateChange {
+</span><span class="boring">        let mut events = Terminal::events().collect::&lt;Vec&lt;_&gt;&gt;();
+</span><span class="boring">
+</span><span class="boring">        self.ui_screen.update(&amp;events, &amp;mut self.selected_action);
+</span><span class="boring">
+</span><span class="boring">        self.render_system();
+</span><span class="boring">
+</span><span class="boring">        self.coroutines_system(&amp;mut events);
+</span><span class="boring">
+</span><span class="boring">        if is_key_pressed(&amp;events, KeyCode::Esc) {
+</span><span class="boring">            GameStateChange::Quit
+</span><span class="boring">        } else {
+</span><span class="boring">            GameStateChange::None
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl Jrpg {
+</span><span class="boring">    fn render_system(&amp;mut self) {
+</span><span class="boring">        self.terminal.begin_draw(true);
+</span><span class="boring">
+</span><span class="boring">        self.ui_screen.render(&amp;mut self.terminal, &amp;self.log);
+</span><span class="boring">
+</span><span class="boring">        self.terminal.end_draw();
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    fn coroutines_system(&amp;mut self, events: &amp;mut Vec&lt;Event&gt;) {
+</span><span class="boring">        let (events_lazy, _events_lifetime) = DynamicManagedLazy::make(events);
+</span><span class="boring">        let (turn_lazy, _turn_lifetime) = DynamicManagedLazy::make(&amp;mut self.turn_index);
+</span><span class="boring">        let (action_lazy, _action_lifetime) = DynamicManagedLazy::make(&amp;mut self.selected_action);
+</span><span class="boring">        let (ui_screen_lazy, _ui_screen_lifetime) = DynamicManagedLazy::make(&amp;mut self.ui_screen);
+</span><span class="boring">        let (log_lazy, _log_lifetime) = DynamicManagedLazy::make(&amp;mut self.log);
+</span><span class="boring">
+</span><span class="boring">        self.jobs.run_local_with_meta(
+</span><span class="boring">            [
+</span><span class="boring">                (EVENTS_META.into(), events_lazy.into()),
+</span><span class="boring">                (TURN_INDEX_META.into(), turn_lazy.into()),
+</span><span class="boring">                (SELECTED_ACTION_META.into(), action_lazy.into()),
+</span><span class="boring">                (UI_SCREEN.into(), ui_screen_lazy.into()),
+</span><span class="boring">                (LOG_META.into(), log_lazy.into()),
+</span><span class="boring">            ]
+</span><span class="boring">            .into_iter()
+</span><span class="boring">            .collect(),
+</span><span class="boring">        );
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn battle(player: AsyncShared&lt;Character&gt;, enemy: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    log("Battle starts!").await;
+</span><span class="boring">
+</span><span class="boring">    // Battle turns loop.
+</span><span class="boring">    loop {
+</span><span class="boring">        if win_conditions(player.clone(), enemy.clone()).await {
+</span><span class="boring">            break;
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        present_information(player.clone(), enemy.clone()).await;
+</span><span class="boring">
+</span><span class="boring">        player_turn(player.clone(), enemy.clone()).await;
+</span><span class="boring">
+</span><span class="boring">        enemy_turn(enemy.clone(), player.clone()).await;
+</span><span class="boring">
+</span><span class="boring">        go_to_next_turn().await;
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    log("Hit ESC to exit the game!").await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn win_conditions(player: AsyncShared&lt;Character&gt;, enemy: AsyncShared&lt;Character&gt;) -&gt; bool {
+</span><span class="boring">    if enemy.read().unwrap().health == 0 {
+</span><span class="boring">        log("Enemy has been defeated! You win!").await;
+</span><span class="boring">        true
+</span><span class="boring">    } else if player.read().unwrap().health == 0 {
+</span><span class="boring">        log("Player has been defeated! Game over.").await;
+</span><span class="boring">        true
+</span><span class="boring">    } else {
+</span><span class="boring">        false
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn present_information(player: AsyncShared&lt;Character&gt;, enemy: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    log(format!(
+</span><span class="boring">        "* New turn #{}\n\
+</span><span class="boring">        - Player health: {}\n\
+</span><span class="boring">        - Player mana: {}\n\
+</span><span class="boring">        - Enemy health: {}",
+</span><span class="boring">        turn_index().await + 1,
+</span><span class="boring">        player.read().unwrap().health,
+</span><span class="boring">        player.read().unwrap().mana,
+</span><span class="boring">        enemy.read().unwrap().health,
+</span><span class="boring">    ))
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    wait_time(STEP_DELAY).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span>async fn player_turn(player: AsyncShared&lt;Character&gt;, enemy: AsyncShared&lt;Character&gt;) {
+    log("* Player turn.\nHit ENTER to take an action!").await;
+
+    wait_for_key(KeyCode::Enter).await;
+
+    loop {
+        match selected_action().await {
+            Action::SkipTurn =&gt; {
+                wait_time(STEP_DELAY).await;
+                return;
+            }
+            Action::Forfeit =&gt; {
+                player.write().unwrap().health = 0;
+                yield_now().await;
+                return;
+            }
+            Action::SwordSwing =&gt; {
+                sword_swing(player.clone(), enemy.clone()).await;
+                return;
+            }
+            Action::PoisonSpell =&gt; {
+                if poison_spell(player.clone(), enemy.clone()).await {
+                    return;
+                }
+            }
+            Action::FireSpell =&gt; {
+                if fire_spell(player.clone(), enemy.clone()).await {
+                    return;
+                }
+            }
+            Action::CureSpell =&gt; {
+                if cure_spell(player.clone()).await {
+                    return;
+                }
+            }
+        }
+
+        yield_now().await;
+    }
+}
+<span class="boring">
+</span><span class="boring">async fn enemy_turn(enemy: AsyncShared&lt;Character&gt;, player: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    log("* Enemy turn").await;
+</span><span class="boring">
+</span><span class="boring">    wait_time(STEP_DELAY).await;
+</span><span class="boring">
+</span><span class="boring">    let action_probabilities = [
+</span><span class="boring">        (4, Action::SwordSwing),
+</span><span class="boring">        (2, Action::PoisonSpell),
+</span><span class="boring">        (1, Action::FireSpell),
+</span><span class="boring">        (
+</span><span class="boring">            if enemy.read().unwrap().health &lt; 50 {
+</span><span class="boring">                4
+</span><span class="boring">            } else {
+</span><span class="boring">                1
+</span><span class="boring">            },
+</span><span class="boring">            Action::CureSpell,
+</span><span class="boring">        ),
+</span><span class="boring">    ];
+</span><span class="boring">
+</span><span class="boring">    loop {
+</span><span class="boring">        match select_random_action(&amp;action_probabilities) {
+</span><span class="boring">            Action::SwordSwing =&gt; {
+</span><span class="boring">                sword_swing(enemy.clone(), player.clone()).await;
+</span><span class="boring">                return;
+</span><span class="boring">            }
+</span><span class="boring">            Action::PoisonSpell =&gt; {
+</span><span class="boring">                if poison_spell(enemy.clone(), player.clone()).await {
+</span><span class="boring">                    return;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">            Action::FireSpell =&gt; {
+</span><span class="boring">                if fire_spell(enemy.clone(), player.clone()).await {
+</span><span class="boring">                    return;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">            Action::CureSpell =&gt; {
+</span><span class="boring">                if cure_spell(enemy.clone()).await {
+</span><span class="boring">                    return;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">            _ =&gt; {
+</span><span class="boring">                wait_time(STEP_DELAY).await;
+</span><span class="boring">                return;
+</span><span class="boring">            }
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        yield_now().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">fn select_random_action(action_probabilities: &amp;[(usize, Action)]) -&gt; Action {
+</span><span class="boring">    let total_weight = action_probabilities
+</span><span class="boring">        .iter()
+</span><span class="boring">        .map(|(weight, _)| *weight)
+</span><span class="boring">        .sum::&lt;usize&gt;();
+</span><span class="boring">    let mut choice = rand::random_range(0..total_weight) % total_weight;
+</span><span class="boring">
+</span><span class="boring">    for (weight, action) in action_probabilities.iter().copied() {
+</span><span class="boring">        if choice &lt; weight {
+</span><span class="boring">            return action;
+</span><span class="boring">        } else {
+</span><span class="boring">            choice -= weight;
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    Action::SkipTurn
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn sword_swing(this: AsyncShared&lt;Character&gt;, target: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    {
+</span><span class="boring">        let mut target = target.write().unwrap();
+</span><span class="boring">        target.health = target.health.saturating_sub(10).max(0);
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    log(format!(
+</span><span class="boring">        "{} swings sword at {}",
+</span><span class="boring">        this.read().unwrap().name,
+</span><span class="boring">        target.read().unwrap().name
+</span><span class="boring">    ))
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    wait_time(STEP_DELAY).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn poison_spell(this: AsyncShared&lt;Character&gt;, target: AsyncShared&lt;Character&gt;) -&gt; bool {
+</span><span class="boring">    let cast = {
+</span><span class="boring">        let mut this = this.write().unwrap();
+</span><span class="boring">        if let Some(mana) = this.mana.checked_sub(30) {
+</span><span class="boring">            this.mana = mana;
+</span><span class="boring">            true
+</span><span class="boring">        } else {
+</span><span class="boring">            false
+</span><span class="boring">        }
+</span><span class="boring">    };
+</span><span class="boring">
+</span><span class="boring">    if cast {
+</span><span class="boring">        spawn(JobLocation::Local, poison_spell_effect(target.clone())).await;
+</span><span class="boring">
+</span><span class="boring">        log(format!(
+</span><span class="boring">            "{} casts poison spell at {}",
+</span><span class="boring">            this.read().unwrap().name,
+</span><span class="boring">            target.read().unwrap().name
+</span><span class="boring">        ))
+</span><span class="boring">        .await;
+</span><span class="boring">
+</span><span class="boring">        wait_time(STEP_DELAY).await;
+</span><span class="boring">    }
+</span><span class="boring">    cast
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn poison_spell_effect(target: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    for index in 0..6 {
+</span><span class="boring">        {
+</span><span class="boring">            let mut target = target.write().unwrap();
+</span><span class="boring">            target.health = target.health.saturating_sub(5).max(0);
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        log(format!(
+</span><span class="boring">            "Poison status damage dealt to {} ({}/6)",
+</span><span class="boring">            target.read().unwrap().name,
+</span><span class="boring">            index + 1,
+</span><span class="boring">        ))
+</span><span class="boring">        .await;
+</span><span class="boring">
+</span><span class="boring">        next_turn().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn fire_spell(this: AsyncShared&lt;Character&gt;, target: AsyncShared&lt;Character&gt;) -&gt; bool {
+</span><span class="boring">    // Attempt to cast the spell by checking and deducting mana.
+</span><span class="boring">    let cast = {
+</span><span class="boring">        let mut this = this.write().unwrap();
+</span><span class="boring">        if let Some(mana) = this.mana.checked_sub(40) {
+</span><span class="boring">            this.mana = mana;
+</span><span class="boring">            true
+</span><span class="boring">        } else {
+</span><span class="boring">            false
+</span><span class="boring">        }
+</span><span class="boring">    };
+</span><span class="boring">
+</span><span class="boring">    if cast {
+</span><span class="boring">        // Spawn the fire spell effect as a concurrent job to be ran in the
+</span><span class="boring">        // background, alongside of battle loop job, and await until it completes.
+</span><span class="boring">        spawn(JobLocation::Local, fire_spell_effect(target.clone())).await;
+</span><span class="boring">
+</span><span class="boring">        log(format!(
+</span><span class="boring">            "{} casts fire spell at {}",
+</span><span class="boring">            this.read().unwrap().name,
+</span><span class="boring">            target.read().unwrap().name
+</span><span class="boring">        ))
+</span><span class="boring">        .await;
+</span><span class="boring">
+</span><span class="boring">        wait_time(STEP_DELAY).await;
+</span><span class="boring">    }
+</span><span class="boring">    cast
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn fire_spell_effect(target: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    // Run this effect for 2 battle turns.
+</span><span class="boring">    for index in 0..2 {
+</span><span class="boring">        {
+</span><span class="boring">            // Deal high damage to target.
+</span><span class="boring">            let mut target = target.write().unwrap();
+</span><span class="boring">            target.health = target.health.saturating_sub(20).max(0);
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        log(format!(
+</span><span class="boring">            "Fire status damage dealt to {} ({}/2)",
+</span><span class="boring">            target.read().unwrap().name,
+</span><span class="boring">            index + 1,
+</span><span class="boring">        ))
+</span><span class="boring">        .await;
+</span><span class="boring">
+</span><span class="boring">        // Wait until next turn to apply next tick of damage.
+</span><span class="boring">        next_turn().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn cure_spell(target: AsyncShared&lt;Character&gt;) -&gt; bool {
+</span><span class="boring">    let cast = {
+</span><span class="boring">        let mut target = target.write().unwrap();
+</span><span class="boring">        if let Some(mana) = target.mana.checked_sub(25) {
+</span><span class="boring">            target.mana = mana;
+</span><span class="boring">            target.health = (target.health + 25).min(HEALTH_CAPACITY);
+</span><span class="boring">            true
+</span><span class="boring">        } else {
+</span><span class="boring">            false
+</span><span class="boring">        }
+</span><span class="boring">    };
+</span><span class="boring">
+</span><span class="boring">    if cast {
+</span><span class="boring">        log(format!(
+</span><span class="boring">            "{} casts cure spell on itself",
+</span><span class="boring">            target.read().unwrap().name
+</span><span class="boring">        ))
+</span><span class="boring">        .await;
+</span><span class="boring">
+</span><span class="boring">        wait_time(STEP_DELAY).await;
+</span><span class="boring">    }
+</span><span class="boring">    cast
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">const ACTIONS: [Action; 6] = [
+</span><span class="boring">    Action::SkipTurn,
+</span><span class="boring">    Action::Forfeit,
+</span><span class="boring">    Action::SwordSwing,
+</span><span class="boring">    Action::PoisonSpell,
+</span><span class="boring">    Action::FireSpell,
+</span><span class="boring">    Action::CureSpell,
+</span><span class="boring">];
+</span><span class="boring">
+</span><span class="boring">#[derive(Clone, Copy, PartialEq, Eq)]
+</span><span class="boring">enum Action {
+</span><span class="boring">    SkipTurn,
+</span><span class="boring">    Forfeit,
+</span><span class="boring">    SwordSwing,
+</span><span class="boring">    PoisonSpell,
+</span><span class="boring">    FireSpell,
+</span><span class="boring">    CureSpell,
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl std::fmt::Display for Action {
+</span><span class="boring">    fn fmt(&amp;self, f: &amp;mut std::fmt::Formatter&lt;'_&gt;) -&gt; std::fmt::Result {
+</span><span class="boring">        let text = match self {
+</span><span class="boring">            Action::SkipTurn =&gt; "Skip Turn",
+</span><span class="boring">            Action::Forfeit =&gt; "Forfeit",
+</span><span class="boring">            Action::SwordSwing =&gt; "Sword Swing",
+</span><span class="boring">            Action::PoisonSpell =&gt; "Poison Spell",
+</span><span class="boring">            Action::FireSpell =&gt; "Fire Spell",
+</span><span class="boring">            Action::CureSpell =&gt; "Cure Spell",
+</span><span class="boring">        };
+</span><span class="boring">        write!(f, "{}", text)
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">trait UiScreen {
+</span><span class="boring">    #[allow(unused_variables)]
+</span><span class="boring">    fn update(&amp;mut self, events: &amp;[Event], selected_action: &amp;mut Option&lt;Action&gt;) {}
+</span><span class="boring">
+</span><span class="boring">    #[allow(unused_variables)]
+</span><span class="boring">    fn render(&amp;self, terminal: &amp;mut Terminal, log: &amp;[String]) {}
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">struct LogsScreen;
+</span><span class="boring">
+</span><span class="boring">impl UiScreen for LogsScreen {
+</span><span class="boring">    fn render(&amp;self, terminal: &amp;mut Terminal, log: &amp;[String]) {
+</span><span class="boring">        let (w, h) = size().unwrap();
+</span><span class="boring">        let mut y = 0;
+</span><span class="boring">
+</span><span class="boring">        for (index, text) in log.iter().rev().enumerate() {
+</span><span class="boring">            let text = text_wrap(text, w as usize);
+</span><span class="boring">            let size = text_size(&amp;text);
+</span><span class="boring">            if y + size.y &gt; h as usize {
+</span><span class="boring">                break;
+</span><span class="boring">            }
+</span><span class="boring">
+</span><span class="boring">            let text = if index == 0 {
+</span><span class="boring">                text.white().bold()
+</span><span class="boring">            } else {
+</span><span class="boring">                text.white().italic()
+</span><span class="boring">            };
+</span><span class="boring">            terminal.display([0, y as _], text);
+</span><span class="boring">            y += size.y + 1;
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">#[derive(Default)]
+</span><span class="boring">struct TakeActionScreen {
+</span><span class="boring">    selected_index: usize,
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl UiScreen for TakeActionScreen {
+</span><span class="boring">    fn update(&amp;mut self, events: &amp;[Event], selected_action: &amp;mut Option&lt;Action&gt;) {
+</span><span class="boring">        if is_key_pressed(events, KeyCode::Up) {
+</span><span class="boring">            self.selected_index = (self.selected_index + ACTIONS.len() - 1) % ACTIONS.len();
+</span><span class="boring">        } else if is_key_pressed(events, KeyCode::Down) {
+</span><span class="boring">            self.selected_index = (self.selected_index + 1) % ACTIONS.len();
+</span><span class="boring">        } else if is_key_pressed(events, KeyCode::Enter) {
+</span><span class="boring">            *selected_action = Some(ACTIONS[self.selected_index]);
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    fn render(&amp;self, terminal: &amp;mut Terminal, _log: &amp;[String]) {
+</span><span class="boring">        let (w, _) = size().unwrap();
+</span><span class="boring">        let mut y = 0;
+</span><span class="boring">
+</span><span class="boring">        let text = text_wrap("Your turn, take an action:", w as usize);
+</span><span class="boring">        let size = text_size(&amp;text);
+</span><span class="boring">
+</span><span class="boring">        terminal.display([0, y as _], text.green());
+</span><span class="boring">
+</span><span class="boring">        y += size.y + 1;
+</span><span class="boring">
+</span><span class="boring">        for (index, action) in ACTIONS.iter().enumerate() {
+</span><span class="boring">            let text = if index == self.selected_index {
+</span><span class="boring">                format!("&gt; {}", action)
+</span><span class="boring">            } else {
+</span><span class="boring">                format!("  {}", action)
+</span><span class="boring">            };
+</span><span class="boring">
+</span><span class="boring">            let text = text_wrap(&amp;text, w as usize);
+</span><span class="boring">            let size = text_size(&amp;text);
+</span><span class="boring">
+</span><span class="boring">            let text = if index == self.selected_index {
+</span><span class="boring">                text.black().on_white().bold()
+</span><span class="boring">            } else {
+</span><span class="boring">                text.white().on_dark_grey().italic()
+</span><span class="boring">            };
+</span><span class="boring">
+</span><span class="boring">            terminal.display([0, y as _], text);
+</span><span class="boring">            y += size.y + 1;
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">struct Character {
+</span><span class="boring">    name: String,
+</span><span class="boring">    health: usize,
+</span><span class="boring">    mana: usize,
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl Character {
+</span><span class="boring">    fn new(name: impl ToString) -&gt; Self {
+</span><span class="boring">        Self {
+</span><span class="boring">            name: name.to_string(),
+</span><span class="boring">            health: HEALTH_CAPACITY,
+</span><span class="boring">            mana: MANA_CAPACITY,
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn go_to_next_turn() {
+</span><span class="boring">    *meta::&lt;usize&gt;(TURN_INDEX_META)
+</span><span class="boring">        .await
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .write()
+</span><span class="boring">        .unwrap() += 1;
+</span><span class="boring">
+</span><span class="boring">    yield_now().await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn turn_index() -&gt; usize {
+</span><span class="boring">    *meta::&lt;usize&gt;(TURN_INDEX_META)
+</span><span class="boring">        .await
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .read()
+</span><span class="boring">        .unwrap()
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn next_turn() {
+</span><span class="boring">    let index = turn_index().await;
+</span><span class="boring">    while turn_index().await &lt;= index {
+</span><span class="boring">        yield_now().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn events() -&gt; Vec&lt;Event&gt; {
+</span><span class="boring">    meta::&lt;Vec&lt;Event&gt;&gt;(EVENTS_META)
+</span><span class="boring">        .await
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .read()
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .clone()
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_key(key: KeyCode) {
+</span><span class="boring">    loop {
+</span><span class="boring">        let events = events().await;
+</span><span class="boring">        if is_key_pressed(&amp;events, key) {
+</span><span class="boring">            return;
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        // Yield to allow other coroutines to run (we suspend this coroutine).
+</span><span class="boring">        // Without suspending, this coroutine will block entirely and prevent
+</span><span class="boring">        // other coroutines from running in local thread (and all our coroutines
+</span><span class="boring">        // are running in local thread, so deadlock guaranteed).
+</span><span class="boring">        yield_now().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn selected_action() -&gt; Action {
+</span><span class="boring">    // Change UI to take action screen.
+</span><span class="boring">    // We hold current UI screen reference available in meta storage to be able
+</span><span class="boring">    // to access it at any time during coroutine work.
+</span><span class="boring">    *meta::&lt;Box&lt;dyn UiScreen&gt;&gt;(UI_SCREEN)
+</span><span class="boring">        .await
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .write()
+</span><span class="boring">        .unwrap() = Box::new(TakeActionScreen::default());
+</span><span class="boring">
+</span><span class="boring">    loop {
+</span><span class="boring">        // Check if an action has been selected from the list.
+</span><span class="boring">        // Currently selected action by the user is stored in meta storage.
+</span><span class="boring">        let action = meta::&lt;Option&lt;Action&gt;&gt;(SELECTED_ACTION_META)
+</span><span class="boring">            .await
+</span><span class="boring">            .unwrap()
+</span><span class="boring">            .write()
+</span><span class="boring">            .unwrap()
+</span><span class="boring">            .take();
+</span><span class="boring">
+</span><span class="boring">        if let Some(action) = action {
+</span><span class="boring">            // Change UI back to logs screen.
+</span><span class="boring">            *meta::&lt;Box&lt;dyn UiScreen&gt;&gt;(UI_SCREEN)
+</span><span class="boring">                .await
+</span><span class="boring">                .unwrap()
+</span><span class="boring">                .write()
+</span><span class="boring">                .unwrap() = Box::new(LogsScreen);
+</span><span class="boring">
+</span><span class="boring">            // Return the selected action.
+</span><span class="boring">            return action;
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        yield_now().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn log(content: impl ToString) {
+</span><span class="boring">    meta::&lt;Vec&lt;String&gt;&gt;(LOG_META)
+</span><span class="boring">        .await
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .write()
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .push(content.to_string());
+</span><span class="boring">
+</span><span class="boring">    yield_now().await;
+</span><span class="boring">}</span></code></pre>
+<p>There are two things interesting us:</p>
+<ul>
+<li><code>wait_for_key()</code></li>
+<li><code>selected_action()</code></li>
+</ul>
+<p>Waiting for turn requires us to check for events if there is a specific key pressed event.</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">use crossterm::{
+</span><span class="boring">    event::{Event, KeyCode},
+</span><span class="boring">    style::Stylize,
+</span><span class="boring">    terminal::size,
+</span><span class="boring">};
+</span><span class="boring">use moirai::{
+</span><span class="boring">    coroutine::{meta, spawn, wait_time, yield_now},
+</span><span class="boring">    job::JobLocation,
+</span><span class="boring">    jobs::Jobs,
+</span><span class="boring">    third_party::intuicio_data::{managed::DynamicManagedLazy, shared::AsyncShared},
+</span><span class="boring">};
+</span><span class="boring">use moirai_book_samples::{
+</span><span class="boring">    game::{Game, GameState, GameStateChange},
+</span><span class="boring">    terminal::Terminal,
+</span><span class="boring">    utils::{is_key_pressed, text_size, text_wrap},
+</span><span class="boring">};
+</span><span class="boring">use std::time::Duration;
+</span><span class="boring">
+</span><span class="boring">fn main() {
+</span><span class="boring">    Game::new(Jrpg::default()).run_blocking();
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">const EVENTS_META: &amp;str = "~events~";
+</span><span class="boring">const TURN_INDEX_META: &amp;str = "~turn-index~";
+</span><span class="boring">const SELECTED_ACTION_META: &amp;str = "~selected-action~";
+</span><span class="boring">const UI_SCREEN: &amp;str = "~ui-screen~";
+</span><span class="boring">const LOG_META: &amp;str = "~log~";
+</span><span class="boring">const STEP_DELAY: Duration = Duration::from_secs(1);
+</span><span class="boring">const HEALTH_CAPACITY: usize = 100;
+</span><span class="boring">const MANA_CAPACITY: usize = 100;
+</span><span class="boring">
+</span><span class="boring">struct Jrpg {
+</span><span class="boring">    terminal: Terminal,
+</span><span class="boring">    jobs: Jobs,
+</span><span class="boring">    turn_index: usize,
+</span><span class="boring">    ui_screen: Box&lt;dyn UiScreen&gt;,
+</span><span class="boring">    selected_action: Option&lt;Action&gt;,
+</span><span class="boring">    log: Vec&lt;String&gt;,
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl Default for Jrpg {
+</span><span class="boring">    fn default() -&gt; Self {
+</span><span class="boring">        let jobs = Jobs::default();
+</span><span class="boring">
+</span><span class="boring">        let player = AsyncShared::new(Character::new("Player"));
+</span><span class="boring">        let enemy = AsyncShared::new(Character::new("Enemy"));
+</span><span class="boring">
+</span><span class="boring">        jobs.queue()
+</span><span class="boring">            .spawn(JobLocation::Local, battle(player, enemy));
+</span><span class="boring">
+</span><span class="boring">        Self {
+</span><span class="boring">            terminal: Terminal::default(),
+</span><span class="boring">            jobs,
+</span><span class="boring">            turn_index: 0,
+</span><span class="boring">            ui_screen: Box::new(LogsScreen),
+</span><span class="boring">            selected_action: None,
+</span><span class="boring">            log: Default::default(),
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl GameState for Jrpg {
+</span><span class="boring">    fn frame(&amp;mut self, _delta_time: Duration) -&gt; GameStateChange {
+</span><span class="boring">        let mut events = Terminal::events().collect::&lt;Vec&lt;_&gt;&gt;();
+</span><span class="boring">
+</span><span class="boring">        self.ui_screen.update(&amp;events, &amp;mut self.selected_action);
+</span><span class="boring">
+</span><span class="boring">        self.render_system();
+</span><span class="boring">
+</span><span class="boring">        self.coroutines_system(&amp;mut events);
+</span><span class="boring">
+</span><span class="boring">        if is_key_pressed(&amp;events, KeyCode::Esc) {
+</span><span class="boring">            GameStateChange::Quit
+</span><span class="boring">        } else {
+</span><span class="boring">            GameStateChange::None
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl Jrpg {
+</span><span class="boring">    fn render_system(&amp;mut self) {
+</span><span class="boring">        self.terminal.begin_draw(true);
+</span><span class="boring">
+</span><span class="boring">        self.ui_screen.render(&amp;mut self.terminal, &amp;self.log);
+</span><span class="boring">
+</span><span class="boring">        self.terminal.end_draw();
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    fn coroutines_system(&amp;mut self, events: &amp;mut Vec&lt;Event&gt;) {
+</span><span class="boring">        let (events_lazy, _events_lifetime) = DynamicManagedLazy::make(events);
+</span><span class="boring">        let (turn_lazy, _turn_lifetime) = DynamicManagedLazy::make(&amp;mut self.turn_index);
+</span><span class="boring">        let (action_lazy, _action_lifetime) = DynamicManagedLazy::make(&amp;mut self.selected_action);
+</span><span class="boring">        let (ui_screen_lazy, _ui_screen_lifetime) = DynamicManagedLazy::make(&amp;mut self.ui_screen);
+</span><span class="boring">        let (log_lazy, _log_lifetime) = DynamicManagedLazy::make(&amp;mut self.log);
+</span><span class="boring">
+</span><span class="boring">        self.jobs.run_local_with_meta(
+</span><span class="boring">            [
+</span><span class="boring">                (EVENTS_META.into(), events_lazy.into()),
+</span><span class="boring">                (TURN_INDEX_META.into(), turn_lazy.into()),
+</span><span class="boring">                (SELECTED_ACTION_META.into(), action_lazy.into()),
+</span><span class="boring">                (UI_SCREEN.into(), ui_screen_lazy.into()),
+</span><span class="boring">                (LOG_META.into(), log_lazy.into()),
+</span><span class="boring">            ]
+</span><span class="boring">            .into_iter()
+</span><span class="boring">            .collect(),
+</span><span class="boring">        );
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn battle(player: AsyncShared&lt;Character&gt;, enemy: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    log("Battle starts!").await;
+</span><span class="boring">
+</span><span class="boring">    // Battle turns loop.
+</span><span class="boring">    loop {
+</span><span class="boring">        if win_conditions(player.clone(), enemy.clone()).await {
+</span><span class="boring">            break;
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        present_information(player.clone(), enemy.clone()).await;
+</span><span class="boring">
+</span><span class="boring">        player_turn(player.clone(), enemy.clone()).await;
+</span><span class="boring">
+</span><span class="boring">        enemy_turn(enemy.clone(), player.clone()).await;
+</span><span class="boring">
+</span><span class="boring">        go_to_next_turn().await;
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    log("Hit ESC to exit the game!").await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn win_conditions(player: AsyncShared&lt;Character&gt;, enemy: AsyncShared&lt;Character&gt;) -&gt; bool {
+</span><span class="boring">    if enemy.read().unwrap().health == 0 {
+</span><span class="boring">        log("Enemy has been defeated! You win!").await;
+</span><span class="boring">        true
+</span><span class="boring">    } else if player.read().unwrap().health == 0 {
+</span><span class="boring">        log("Player has been defeated! Game over.").await;
+</span><span class="boring">        true
+</span><span class="boring">    } else {
+</span><span class="boring">        false
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn present_information(player: AsyncShared&lt;Character&gt;, enemy: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    log(format!(
+</span><span class="boring">        "* New turn #{}\n\
+</span><span class="boring">        - Player health: {}\n\
+</span><span class="boring">        - Player mana: {}\n\
+</span><span class="boring">        - Enemy health: {}",
+</span><span class="boring">        turn_index().await + 1,
+</span><span class="boring">        player.read().unwrap().health,
+</span><span class="boring">        player.read().unwrap().mana,
+</span><span class="boring">        enemy.read().unwrap().health,
+</span><span class="boring">    ))
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    wait_time(STEP_DELAY).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn player_turn(player: AsyncShared&lt;Character&gt;, enemy: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    log("* Player turn.\nHit ENTER to take an action!").await;
+</span><span class="boring">
+</span><span class="boring">    wait_for_key(KeyCode::Enter).await;
+</span><span class="boring">
+</span><span class="boring">    loop {
+</span><span class="boring">        match selected_action().await {
+</span><span class="boring">            Action::SkipTurn =&gt; {
+</span><span class="boring">                wait_time(STEP_DELAY).await;
+</span><span class="boring">                return;
+</span><span class="boring">            }
+</span><span class="boring">            Action::Forfeit =&gt; {
+</span><span class="boring">                player.write().unwrap().health = 0;
+</span><span class="boring">                yield_now().await;
+</span><span class="boring">                return;
+</span><span class="boring">            }
+</span><span class="boring">            Action::SwordSwing =&gt; {
+</span><span class="boring">                sword_swing(player.clone(), enemy.clone()).await;
+</span><span class="boring">                return;
+</span><span class="boring">            }
+</span><span class="boring">            Action::PoisonSpell =&gt; {
+</span><span class="boring">                if poison_spell(player.clone(), enemy.clone()).await {
+</span><span class="boring">                    return;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">            Action::FireSpell =&gt; {
+</span><span class="boring">                if fire_spell(player.clone(), enemy.clone()).await {
+</span><span class="boring">                    return;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">            Action::CureSpell =&gt; {
+</span><span class="boring">                if cure_spell(player.clone()).await {
+</span><span class="boring">                    return;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        yield_now().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn enemy_turn(enemy: AsyncShared&lt;Character&gt;, player: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    log("* Enemy turn").await;
+</span><span class="boring">
+</span><span class="boring">    wait_time(STEP_DELAY).await;
+</span><span class="boring">
+</span><span class="boring">    let action_probabilities = [
+</span><span class="boring">        (4, Action::SwordSwing),
+</span><span class="boring">        (2, Action::PoisonSpell),
+</span><span class="boring">        (1, Action::FireSpell),
+</span><span class="boring">        (
+</span><span class="boring">            if enemy.read().unwrap().health &lt; 50 {
+</span><span class="boring">                4
+</span><span class="boring">            } else {
+</span><span class="boring">                1
+</span><span class="boring">            },
+</span><span class="boring">            Action::CureSpell,
+</span><span class="boring">        ),
+</span><span class="boring">    ];
+</span><span class="boring">
+</span><span class="boring">    loop {
+</span><span class="boring">        match select_random_action(&amp;action_probabilities) {
+</span><span class="boring">            Action::SwordSwing =&gt; {
+</span><span class="boring">                sword_swing(enemy.clone(), player.clone()).await;
+</span><span class="boring">                return;
+</span><span class="boring">            }
+</span><span class="boring">            Action::PoisonSpell =&gt; {
+</span><span class="boring">                if poison_spell(enemy.clone(), player.clone()).await {
+</span><span class="boring">                    return;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">            Action::FireSpell =&gt; {
+</span><span class="boring">                if fire_spell(enemy.clone(), player.clone()).await {
+</span><span class="boring">                    return;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">            Action::CureSpell =&gt; {
+</span><span class="boring">                if cure_spell(enemy.clone()).await {
+</span><span class="boring">                    return;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">            _ =&gt; {
+</span><span class="boring">                wait_time(STEP_DELAY).await;
+</span><span class="boring">                return;
+</span><span class="boring">            }
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        yield_now().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">fn select_random_action(action_probabilities: &amp;[(usize, Action)]) -&gt; Action {
+</span><span class="boring">    let total_weight = action_probabilities
+</span><span class="boring">        .iter()
+</span><span class="boring">        .map(|(weight, _)| *weight)
+</span><span class="boring">        .sum::&lt;usize&gt;();
+</span><span class="boring">    let mut choice = rand::random_range(0..total_weight) % total_weight;
+</span><span class="boring">
+</span><span class="boring">    for (weight, action) in action_probabilities.iter().copied() {
+</span><span class="boring">        if choice &lt; weight {
+</span><span class="boring">            return action;
+</span><span class="boring">        } else {
+</span><span class="boring">            choice -= weight;
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    Action::SkipTurn
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn sword_swing(this: AsyncShared&lt;Character&gt;, target: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    {
+</span><span class="boring">        let mut target = target.write().unwrap();
+</span><span class="boring">        target.health = target.health.saturating_sub(10).max(0);
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    log(format!(
+</span><span class="boring">        "{} swings sword at {}",
+</span><span class="boring">        this.read().unwrap().name,
+</span><span class="boring">        target.read().unwrap().name
+</span><span class="boring">    ))
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    wait_time(STEP_DELAY).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn poison_spell(this: AsyncShared&lt;Character&gt;, target: AsyncShared&lt;Character&gt;) -&gt; bool {
+</span><span class="boring">    let cast = {
+</span><span class="boring">        let mut this = this.write().unwrap();
+</span><span class="boring">        if let Some(mana) = this.mana.checked_sub(30) {
+</span><span class="boring">            this.mana = mana;
+</span><span class="boring">            true
+</span><span class="boring">        } else {
+</span><span class="boring">            false
+</span><span class="boring">        }
+</span><span class="boring">    };
+</span><span class="boring">
+</span><span class="boring">    if cast {
+</span><span class="boring">        spawn(JobLocation::Local, poison_spell_effect(target.clone())).await;
+</span><span class="boring">
+</span><span class="boring">        log(format!(
+</span><span class="boring">            "{} casts poison spell at {}",
+</span><span class="boring">            this.read().unwrap().name,
+</span><span class="boring">            target.read().unwrap().name
+</span><span class="boring">        ))
+</span><span class="boring">        .await;
+</span><span class="boring">
+</span><span class="boring">        wait_time(STEP_DELAY).await;
+</span><span class="boring">    }
+</span><span class="boring">    cast
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn poison_spell_effect(target: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    for index in 0..6 {
+</span><span class="boring">        {
+</span><span class="boring">            let mut target = target.write().unwrap();
+</span><span class="boring">            target.health = target.health.saturating_sub(5).max(0);
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        log(format!(
+</span><span class="boring">            "Poison status damage dealt to {} ({}/6)",
+</span><span class="boring">            target.read().unwrap().name,
+</span><span class="boring">            index + 1,
+</span><span class="boring">        ))
+</span><span class="boring">        .await;
+</span><span class="boring">
+</span><span class="boring">        next_turn().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn fire_spell(this: AsyncShared&lt;Character&gt;, target: AsyncShared&lt;Character&gt;) -&gt; bool {
+</span><span class="boring">    // Attempt to cast the spell by checking and deducting mana.
+</span><span class="boring">    let cast = {
+</span><span class="boring">        let mut this = this.write().unwrap();
+</span><span class="boring">        if let Some(mana) = this.mana.checked_sub(40) {
+</span><span class="boring">            this.mana = mana;
+</span><span class="boring">            true
+</span><span class="boring">        } else {
+</span><span class="boring">            false
+</span><span class="boring">        }
+</span><span class="boring">    };
+</span><span class="boring">
+</span><span class="boring">    if cast {
+</span><span class="boring">        // Spawn the fire spell effect as a concurrent job to be ran in the
+</span><span class="boring">        // background, alongside of battle loop job, and await until it completes.
+</span><span class="boring">        spawn(JobLocation::Local, fire_spell_effect(target.clone())).await;
+</span><span class="boring">
+</span><span class="boring">        log(format!(
+</span><span class="boring">            "{} casts fire spell at {}",
+</span><span class="boring">            this.read().unwrap().name,
+</span><span class="boring">            target.read().unwrap().name
+</span><span class="boring">        ))
+</span><span class="boring">        .await;
+</span><span class="boring">
+</span><span class="boring">        wait_time(STEP_DELAY).await;
+</span><span class="boring">    }
+</span><span class="boring">    cast
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn fire_spell_effect(target: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    // Run this effect for 2 battle turns.
+</span><span class="boring">    for index in 0..2 {
+</span><span class="boring">        {
+</span><span class="boring">            // Deal high damage to target.
+</span><span class="boring">            let mut target = target.write().unwrap();
+</span><span class="boring">            target.health = target.health.saturating_sub(20).max(0);
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        log(format!(
+</span><span class="boring">            "Fire status damage dealt to {} ({}/2)",
+</span><span class="boring">            target.read().unwrap().name,
+</span><span class="boring">            index + 1,
+</span><span class="boring">        ))
+</span><span class="boring">        .await;
+</span><span class="boring">
+</span><span class="boring">        // Wait until next turn to apply next tick of damage.
+</span><span class="boring">        next_turn().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn cure_spell(target: AsyncShared&lt;Character&gt;) -&gt; bool {
+</span><span class="boring">    let cast = {
+</span><span class="boring">        let mut target = target.write().unwrap();
+</span><span class="boring">        if let Some(mana) = target.mana.checked_sub(25) {
+</span><span class="boring">            target.mana = mana;
+</span><span class="boring">            target.health = (target.health + 25).min(HEALTH_CAPACITY);
+</span><span class="boring">            true
+</span><span class="boring">        } else {
+</span><span class="boring">            false
+</span><span class="boring">        }
+</span><span class="boring">    };
+</span><span class="boring">
+</span><span class="boring">    if cast {
+</span><span class="boring">        log(format!(
+</span><span class="boring">            "{} casts cure spell on itself",
+</span><span class="boring">            target.read().unwrap().name
+</span><span class="boring">        ))
+</span><span class="boring">        .await;
+</span><span class="boring">
+</span><span class="boring">        wait_time(STEP_DELAY).await;
+</span><span class="boring">    }
+</span><span class="boring">    cast
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">const ACTIONS: [Action; 6] = [
+</span><span class="boring">    Action::SkipTurn,
+</span><span class="boring">    Action::Forfeit,
+</span><span class="boring">    Action::SwordSwing,
+</span><span class="boring">    Action::PoisonSpell,
+</span><span class="boring">    Action::FireSpell,
+</span><span class="boring">    Action::CureSpell,
+</span><span class="boring">];
+</span><span class="boring">
+</span><span class="boring">#[derive(Clone, Copy, PartialEq, Eq)]
+</span><span class="boring">enum Action {
+</span><span class="boring">    SkipTurn,
+</span><span class="boring">    Forfeit,
+</span><span class="boring">    SwordSwing,
+</span><span class="boring">    PoisonSpell,
+</span><span class="boring">    FireSpell,
+</span><span class="boring">    CureSpell,
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl std::fmt::Display for Action {
+</span><span class="boring">    fn fmt(&amp;self, f: &amp;mut std::fmt::Formatter&lt;'_&gt;) -&gt; std::fmt::Result {
+</span><span class="boring">        let text = match self {
+</span><span class="boring">            Action::SkipTurn =&gt; "Skip Turn",
+</span><span class="boring">            Action::Forfeit =&gt; "Forfeit",
+</span><span class="boring">            Action::SwordSwing =&gt; "Sword Swing",
+</span><span class="boring">            Action::PoisonSpell =&gt; "Poison Spell",
+</span><span class="boring">            Action::FireSpell =&gt; "Fire Spell",
+</span><span class="boring">            Action::CureSpell =&gt; "Cure Spell",
+</span><span class="boring">        };
+</span><span class="boring">        write!(f, "{}", text)
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">trait UiScreen {
+</span><span class="boring">    #[allow(unused_variables)]
+</span><span class="boring">    fn update(&amp;mut self, events: &amp;[Event], selected_action: &amp;mut Option&lt;Action&gt;) {}
+</span><span class="boring">
+</span><span class="boring">    #[allow(unused_variables)]
+</span><span class="boring">    fn render(&amp;self, terminal: &amp;mut Terminal, log: &amp;[String]) {}
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">struct LogsScreen;
+</span><span class="boring">
+</span><span class="boring">impl UiScreen for LogsScreen {
+</span><span class="boring">    fn render(&amp;self, terminal: &amp;mut Terminal, log: &amp;[String]) {
+</span><span class="boring">        let (w, h) = size().unwrap();
+</span><span class="boring">        let mut y = 0;
+</span><span class="boring">
+</span><span class="boring">        for (index, text) in log.iter().rev().enumerate() {
+</span><span class="boring">            let text = text_wrap(text, w as usize);
+</span><span class="boring">            let size = text_size(&amp;text);
+</span><span class="boring">            if y + size.y &gt; h as usize {
+</span><span class="boring">                break;
+</span><span class="boring">            }
+</span><span class="boring">
+</span><span class="boring">            let text = if index == 0 {
+</span><span class="boring">                text.white().bold()
+</span><span class="boring">            } else {
+</span><span class="boring">                text.white().italic()
+</span><span class="boring">            };
+</span><span class="boring">            terminal.display([0, y as _], text);
+</span><span class="boring">            y += size.y + 1;
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">#[derive(Default)]
+</span><span class="boring">struct TakeActionScreen {
+</span><span class="boring">    selected_index: usize,
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl UiScreen for TakeActionScreen {
+</span><span class="boring">    fn update(&amp;mut self, events: &amp;[Event], selected_action: &amp;mut Option&lt;Action&gt;) {
+</span><span class="boring">        if is_key_pressed(events, KeyCode::Up) {
+</span><span class="boring">            self.selected_index = (self.selected_index + ACTIONS.len() - 1) % ACTIONS.len();
+</span><span class="boring">        } else if is_key_pressed(events, KeyCode::Down) {
+</span><span class="boring">            self.selected_index = (self.selected_index + 1) % ACTIONS.len();
+</span><span class="boring">        } else if is_key_pressed(events, KeyCode::Enter) {
+</span><span class="boring">            *selected_action = Some(ACTIONS[self.selected_index]);
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    fn render(&amp;self, terminal: &amp;mut Terminal, _log: &amp;[String]) {
+</span><span class="boring">        let (w, _) = size().unwrap();
+</span><span class="boring">        let mut y = 0;
+</span><span class="boring">
+</span><span class="boring">        let text = text_wrap("Your turn, take an action:", w as usize);
+</span><span class="boring">        let size = text_size(&amp;text);
+</span><span class="boring">
+</span><span class="boring">        terminal.display([0, y as _], text.green());
+</span><span class="boring">
+</span><span class="boring">        y += size.y + 1;
+</span><span class="boring">
+</span><span class="boring">        for (index, action) in ACTIONS.iter().enumerate() {
+</span><span class="boring">            let text = if index == self.selected_index {
+</span><span class="boring">                format!("&gt; {}", action)
+</span><span class="boring">            } else {
+</span><span class="boring">                format!("  {}", action)
+</span><span class="boring">            };
+</span><span class="boring">
+</span><span class="boring">            let text = text_wrap(&amp;text, w as usize);
+</span><span class="boring">            let size = text_size(&amp;text);
+</span><span class="boring">
+</span><span class="boring">            let text = if index == self.selected_index {
+</span><span class="boring">                text.black().on_white().bold()
+</span><span class="boring">            } else {
+</span><span class="boring">                text.white().on_dark_grey().italic()
+</span><span class="boring">            };
+</span><span class="boring">
+</span><span class="boring">            terminal.display([0, y as _], text);
+</span><span class="boring">            y += size.y + 1;
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">struct Character {
+</span><span class="boring">    name: String,
+</span><span class="boring">    health: usize,
+</span><span class="boring">    mana: usize,
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl Character {
+</span><span class="boring">    fn new(name: impl ToString) -&gt; Self {
+</span><span class="boring">        Self {
+</span><span class="boring">            name: name.to_string(),
+</span><span class="boring">            health: HEALTH_CAPACITY,
+</span><span class="boring">            mana: MANA_CAPACITY,
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn go_to_next_turn() {
+</span><span class="boring">    *meta::&lt;usize&gt;(TURN_INDEX_META)
+</span><span class="boring">        .await
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .write()
+</span><span class="boring">        .unwrap() += 1;
+</span><span class="boring">
+</span><span class="boring">    yield_now().await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn turn_index() -&gt; usize {
+</span><span class="boring">    *meta::&lt;usize&gt;(TURN_INDEX_META)
+</span><span class="boring">        .await
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .read()
+</span><span class="boring">        .unwrap()
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn next_turn() {
+</span><span class="boring">    let index = turn_index().await;
+</span><span class="boring">    while turn_index().await &lt;= index {
+</span><span class="boring">        yield_now().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn events() -&gt; Vec&lt;Event&gt; {
+</span><span class="boring">    meta::&lt;Vec&lt;Event&gt;&gt;(EVENTS_META)
+</span><span class="boring">        .await
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .read()
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .clone()
+</span><span class="boring">}
+</span><span class="boring">
+</span>async fn wait_for_key(key: KeyCode) {
+    loop {
+        let events = events().await;
+        if is_key_pressed(&amp;events, key) {
+            return;
+        }
+
+        // Yield to allow other coroutines to run (we suspend this coroutine).
+        // Without suspending, this coroutine will block entirely and prevent
+        // other coroutines from running in local thread (and all our coroutines
+        // are running in local thread, so deadlock guaranteed).
+        yield_now().await;
+    }
+}
+<span class="boring">
+</span><span class="boring">async fn selected_action() -&gt; Action {
+</span><span class="boring">    // Change UI to take action screen.
+</span><span class="boring">    // We hold current UI screen reference available in meta storage to be able
+</span><span class="boring">    // to access it at any time during coroutine work.
+</span><span class="boring">    *meta::&lt;Box&lt;dyn UiScreen&gt;&gt;(UI_SCREEN)
+</span><span class="boring">        .await
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .write()
+</span><span class="boring">        .unwrap() = Box::new(TakeActionScreen::default());
+</span><span class="boring">
+</span><span class="boring">    loop {
+</span><span class="boring">        // Check if an action has been selected from the list.
+</span><span class="boring">        // Currently selected action by the user is stored in meta storage.
+</span><span class="boring">        let action = meta::&lt;Option&lt;Action&gt;&gt;(SELECTED_ACTION_META)
+</span><span class="boring">            .await
+</span><span class="boring">            .unwrap()
+</span><span class="boring">            .write()
+</span><span class="boring">            .unwrap()
+</span><span class="boring">            .take();
+</span><span class="boring">
+</span><span class="boring">        if let Some(action) = action {
+</span><span class="boring">            // Change UI back to logs screen.
+</span><span class="boring">            *meta::&lt;Box&lt;dyn UiScreen&gt;&gt;(UI_SCREEN)
+</span><span class="boring">                .await
+</span><span class="boring">                .unwrap()
+</span><span class="boring">                .write()
+</span><span class="boring">                .unwrap() = Box::new(LogsScreen);
+</span><span class="boring">
+</span><span class="boring">            // Return the selected action.
+</span><span class="boring">            return action;
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        yield_now().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn log(content: impl ToString) {
+</span><span class="boring">    meta::&lt;Vec&lt;String&gt;&gt;(LOG_META)
+</span><span class="boring">        .await
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .write()
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .push(content.to_string());
+</span><span class="boring">
+</span><span class="boring">    yield_now().await;
+</span><span class="boring">}</span></code></pre>
+<p>While awaiting for user selected action is bit more complex, as it interacts with the user input and UI widget to fetch data from the UI options list.</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">use crossterm::{
+</span><span class="boring">    event::{Event, KeyCode},
+</span><span class="boring">    style::Stylize,
+</span><span class="boring">    terminal::size,
+</span><span class="boring">};
+</span><span class="boring">use moirai::{
+</span><span class="boring">    coroutine::{meta, spawn, wait_time, yield_now},
+</span><span class="boring">    job::JobLocation,
+</span><span class="boring">    jobs::Jobs,
+</span><span class="boring">    third_party::intuicio_data::{managed::DynamicManagedLazy, shared::AsyncShared},
+</span><span class="boring">};
+</span><span class="boring">use moirai_book_samples::{
+</span><span class="boring">    game::{Game, GameState, GameStateChange},
+</span><span class="boring">    terminal::Terminal,
+</span><span class="boring">    utils::{is_key_pressed, text_size, text_wrap},
+</span><span class="boring">};
+</span><span class="boring">use std::time::Duration;
+</span><span class="boring">
+</span><span class="boring">fn main() {
+</span><span class="boring">    Game::new(Jrpg::default()).run_blocking();
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">const EVENTS_META: &amp;str = "~events~";
+</span><span class="boring">const TURN_INDEX_META: &amp;str = "~turn-index~";
+</span><span class="boring">const SELECTED_ACTION_META: &amp;str = "~selected-action~";
+</span><span class="boring">const UI_SCREEN: &amp;str = "~ui-screen~";
+</span><span class="boring">const LOG_META: &amp;str = "~log~";
+</span><span class="boring">const STEP_DELAY: Duration = Duration::from_secs(1);
+</span><span class="boring">const HEALTH_CAPACITY: usize = 100;
+</span><span class="boring">const MANA_CAPACITY: usize = 100;
+</span><span class="boring">
+</span><span class="boring">struct Jrpg {
+</span><span class="boring">    terminal: Terminal,
+</span><span class="boring">    jobs: Jobs,
+</span><span class="boring">    turn_index: usize,
+</span><span class="boring">    ui_screen: Box&lt;dyn UiScreen&gt;,
+</span><span class="boring">    selected_action: Option&lt;Action&gt;,
+</span><span class="boring">    log: Vec&lt;String&gt;,
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl Default for Jrpg {
+</span><span class="boring">    fn default() -&gt; Self {
+</span><span class="boring">        let jobs = Jobs::default();
+</span><span class="boring">
+</span><span class="boring">        let player = AsyncShared::new(Character::new("Player"));
+</span><span class="boring">        let enemy = AsyncShared::new(Character::new("Enemy"));
+</span><span class="boring">
+</span><span class="boring">        jobs.queue()
+</span><span class="boring">            .spawn(JobLocation::Local, battle(player, enemy));
+</span><span class="boring">
+</span><span class="boring">        Self {
+</span><span class="boring">            terminal: Terminal::default(),
+</span><span class="boring">            jobs,
+</span><span class="boring">            turn_index: 0,
+</span><span class="boring">            ui_screen: Box::new(LogsScreen),
+</span><span class="boring">            selected_action: None,
+</span><span class="boring">            log: Default::default(),
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl GameState for Jrpg {
+</span><span class="boring">    fn frame(&amp;mut self, _delta_time: Duration) -&gt; GameStateChange {
+</span><span class="boring">        let mut events = Terminal::events().collect::&lt;Vec&lt;_&gt;&gt;();
+</span><span class="boring">
+</span><span class="boring">        self.ui_screen.update(&amp;events, &amp;mut self.selected_action);
+</span><span class="boring">
+</span><span class="boring">        self.render_system();
+</span><span class="boring">
+</span><span class="boring">        self.coroutines_system(&amp;mut events);
+</span><span class="boring">
+</span><span class="boring">        if is_key_pressed(&amp;events, KeyCode::Esc) {
+</span><span class="boring">            GameStateChange::Quit
+</span><span class="boring">        } else {
+</span><span class="boring">            GameStateChange::None
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl Jrpg {
+</span><span class="boring">    fn render_system(&amp;mut self) {
+</span><span class="boring">        self.terminal.begin_draw(true);
+</span><span class="boring">
+</span><span class="boring">        self.ui_screen.render(&amp;mut self.terminal, &amp;self.log);
+</span><span class="boring">
+</span><span class="boring">        self.terminal.end_draw();
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    fn coroutines_system(&amp;mut self, events: &amp;mut Vec&lt;Event&gt;) {
+</span><span class="boring">        let (events_lazy, _events_lifetime) = DynamicManagedLazy::make(events);
+</span><span class="boring">        let (turn_lazy, _turn_lifetime) = DynamicManagedLazy::make(&amp;mut self.turn_index);
+</span><span class="boring">        let (action_lazy, _action_lifetime) = DynamicManagedLazy::make(&amp;mut self.selected_action);
+</span><span class="boring">        let (ui_screen_lazy, _ui_screen_lifetime) = DynamicManagedLazy::make(&amp;mut self.ui_screen);
+</span><span class="boring">        let (log_lazy, _log_lifetime) = DynamicManagedLazy::make(&amp;mut self.log);
+</span><span class="boring">
+</span><span class="boring">        self.jobs.run_local_with_meta(
+</span><span class="boring">            [
+</span><span class="boring">                (EVENTS_META.into(), events_lazy.into()),
+</span><span class="boring">                (TURN_INDEX_META.into(), turn_lazy.into()),
+</span><span class="boring">                (SELECTED_ACTION_META.into(), action_lazy.into()),
+</span><span class="boring">                (UI_SCREEN.into(), ui_screen_lazy.into()),
+</span><span class="boring">                (LOG_META.into(), log_lazy.into()),
+</span><span class="boring">            ]
+</span><span class="boring">            .into_iter()
+</span><span class="boring">            .collect(),
+</span><span class="boring">        );
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn battle(player: AsyncShared&lt;Character&gt;, enemy: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    log("Battle starts!").await;
+</span><span class="boring">
+</span><span class="boring">    // Battle turns loop.
+</span><span class="boring">    loop {
+</span><span class="boring">        if win_conditions(player.clone(), enemy.clone()).await {
+</span><span class="boring">            break;
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        present_information(player.clone(), enemy.clone()).await;
+</span><span class="boring">
+</span><span class="boring">        player_turn(player.clone(), enemy.clone()).await;
+</span><span class="boring">
+</span><span class="boring">        enemy_turn(enemy.clone(), player.clone()).await;
+</span><span class="boring">
+</span><span class="boring">        go_to_next_turn().await;
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    log("Hit ESC to exit the game!").await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn win_conditions(player: AsyncShared&lt;Character&gt;, enemy: AsyncShared&lt;Character&gt;) -&gt; bool {
+</span><span class="boring">    if enemy.read().unwrap().health == 0 {
+</span><span class="boring">        log("Enemy has been defeated! You win!").await;
+</span><span class="boring">        true
+</span><span class="boring">    } else if player.read().unwrap().health == 0 {
+</span><span class="boring">        log("Player has been defeated! Game over.").await;
+</span><span class="boring">        true
+</span><span class="boring">    } else {
+</span><span class="boring">        false
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn present_information(player: AsyncShared&lt;Character&gt;, enemy: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    log(format!(
+</span><span class="boring">        "* New turn #{}\n\
+</span><span class="boring">        - Player health: {}\n\
+</span><span class="boring">        - Player mana: {}\n\
+</span><span class="boring">        - Enemy health: {}",
+</span><span class="boring">        turn_index().await + 1,
+</span><span class="boring">        player.read().unwrap().health,
+</span><span class="boring">        player.read().unwrap().mana,
+</span><span class="boring">        enemy.read().unwrap().health,
+</span><span class="boring">    ))
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    wait_time(STEP_DELAY).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn player_turn(player: AsyncShared&lt;Character&gt;, enemy: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    log("* Player turn.\nHit ENTER to take an action!").await;
+</span><span class="boring">
+</span><span class="boring">    wait_for_key(KeyCode::Enter).await;
+</span><span class="boring">
+</span><span class="boring">    loop {
+</span><span class="boring">        match selected_action().await {
+</span><span class="boring">            Action::SkipTurn =&gt; {
+</span><span class="boring">                wait_time(STEP_DELAY).await;
+</span><span class="boring">                return;
+</span><span class="boring">            }
+</span><span class="boring">            Action::Forfeit =&gt; {
+</span><span class="boring">                player.write().unwrap().health = 0;
+</span><span class="boring">                yield_now().await;
+</span><span class="boring">                return;
+</span><span class="boring">            }
+</span><span class="boring">            Action::SwordSwing =&gt; {
+</span><span class="boring">                sword_swing(player.clone(), enemy.clone()).await;
+</span><span class="boring">                return;
+</span><span class="boring">            }
+</span><span class="boring">            Action::PoisonSpell =&gt; {
+</span><span class="boring">                if poison_spell(player.clone(), enemy.clone()).await {
+</span><span class="boring">                    return;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">            Action::FireSpell =&gt; {
+</span><span class="boring">                if fire_spell(player.clone(), enemy.clone()).await {
+</span><span class="boring">                    return;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">            Action::CureSpell =&gt; {
+</span><span class="boring">                if cure_spell(player.clone()).await {
+</span><span class="boring">                    return;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        yield_now().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn enemy_turn(enemy: AsyncShared&lt;Character&gt;, player: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    log("* Enemy turn").await;
+</span><span class="boring">
+</span><span class="boring">    wait_time(STEP_DELAY).await;
+</span><span class="boring">
+</span><span class="boring">    let action_probabilities = [
+</span><span class="boring">        (4, Action::SwordSwing),
+</span><span class="boring">        (2, Action::PoisonSpell),
+</span><span class="boring">        (1, Action::FireSpell),
+</span><span class="boring">        (
+</span><span class="boring">            if enemy.read().unwrap().health &lt; 50 {
+</span><span class="boring">                4
+</span><span class="boring">            } else {
+</span><span class="boring">                1
+</span><span class="boring">            },
+</span><span class="boring">            Action::CureSpell,
+</span><span class="boring">        ),
+</span><span class="boring">    ];
+</span><span class="boring">
+</span><span class="boring">    loop {
+</span><span class="boring">        match select_random_action(&amp;action_probabilities) {
+</span><span class="boring">            Action::SwordSwing =&gt; {
+</span><span class="boring">                sword_swing(enemy.clone(), player.clone()).await;
+</span><span class="boring">                return;
+</span><span class="boring">            }
+</span><span class="boring">            Action::PoisonSpell =&gt; {
+</span><span class="boring">                if poison_spell(enemy.clone(), player.clone()).await {
+</span><span class="boring">                    return;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">            Action::FireSpell =&gt; {
+</span><span class="boring">                if fire_spell(enemy.clone(), player.clone()).await {
+</span><span class="boring">                    return;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">            Action::CureSpell =&gt; {
+</span><span class="boring">                if cure_spell(enemy.clone()).await {
+</span><span class="boring">                    return;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">            _ =&gt; {
+</span><span class="boring">                wait_time(STEP_DELAY).await;
+</span><span class="boring">                return;
+</span><span class="boring">            }
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        yield_now().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">fn select_random_action(action_probabilities: &amp;[(usize, Action)]) -&gt; Action {
+</span><span class="boring">    let total_weight = action_probabilities
+</span><span class="boring">        .iter()
+</span><span class="boring">        .map(|(weight, _)| *weight)
+</span><span class="boring">        .sum::&lt;usize&gt;();
+</span><span class="boring">    let mut choice = rand::random_range(0..total_weight) % total_weight;
+</span><span class="boring">
+</span><span class="boring">    for (weight, action) in action_probabilities.iter().copied() {
+</span><span class="boring">        if choice &lt; weight {
+</span><span class="boring">            return action;
+</span><span class="boring">        } else {
+</span><span class="boring">            choice -= weight;
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    Action::SkipTurn
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn sword_swing(this: AsyncShared&lt;Character&gt;, target: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    {
+</span><span class="boring">        let mut target = target.write().unwrap();
+</span><span class="boring">        target.health = target.health.saturating_sub(10).max(0);
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    log(format!(
+</span><span class="boring">        "{} swings sword at {}",
+</span><span class="boring">        this.read().unwrap().name,
+</span><span class="boring">        target.read().unwrap().name
+</span><span class="boring">    ))
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    wait_time(STEP_DELAY).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn poison_spell(this: AsyncShared&lt;Character&gt;, target: AsyncShared&lt;Character&gt;) -&gt; bool {
+</span><span class="boring">    let cast = {
+</span><span class="boring">        let mut this = this.write().unwrap();
+</span><span class="boring">        if let Some(mana) = this.mana.checked_sub(30) {
+</span><span class="boring">            this.mana = mana;
+</span><span class="boring">            true
+</span><span class="boring">        } else {
+</span><span class="boring">            false
+</span><span class="boring">        }
+</span><span class="boring">    };
+</span><span class="boring">
+</span><span class="boring">    if cast {
+</span><span class="boring">        spawn(JobLocation::Local, poison_spell_effect(target.clone())).await;
+</span><span class="boring">
+</span><span class="boring">        log(format!(
+</span><span class="boring">            "{} casts poison spell at {}",
+</span><span class="boring">            this.read().unwrap().name,
+</span><span class="boring">            target.read().unwrap().name
+</span><span class="boring">        ))
+</span><span class="boring">        .await;
+</span><span class="boring">
+</span><span class="boring">        wait_time(STEP_DELAY).await;
+</span><span class="boring">    }
+</span><span class="boring">    cast
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn poison_spell_effect(target: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    for index in 0..6 {
+</span><span class="boring">        {
+</span><span class="boring">            let mut target = target.write().unwrap();
+</span><span class="boring">            target.health = target.health.saturating_sub(5).max(0);
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        log(format!(
+</span><span class="boring">            "Poison status damage dealt to {} ({}/6)",
+</span><span class="boring">            target.read().unwrap().name,
+</span><span class="boring">            index + 1,
+</span><span class="boring">        ))
+</span><span class="boring">        .await;
+</span><span class="boring">
+</span><span class="boring">        next_turn().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn fire_spell(this: AsyncShared&lt;Character&gt;, target: AsyncShared&lt;Character&gt;) -&gt; bool {
+</span><span class="boring">    // Attempt to cast the spell by checking and deducting mana.
+</span><span class="boring">    let cast = {
+</span><span class="boring">        let mut this = this.write().unwrap();
+</span><span class="boring">        if let Some(mana) = this.mana.checked_sub(40) {
+</span><span class="boring">            this.mana = mana;
+</span><span class="boring">            true
+</span><span class="boring">        } else {
+</span><span class="boring">            false
+</span><span class="boring">        }
+</span><span class="boring">    };
+</span><span class="boring">
+</span><span class="boring">    if cast {
+</span><span class="boring">        // Spawn the fire spell effect as a concurrent job to be ran in the
+</span><span class="boring">        // background, alongside of battle loop job, and await until it completes.
+</span><span class="boring">        spawn(JobLocation::Local, fire_spell_effect(target.clone())).await;
+</span><span class="boring">
+</span><span class="boring">        log(format!(
+</span><span class="boring">            "{} casts fire spell at {}",
+</span><span class="boring">            this.read().unwrap().name,
+</span><span class="boring">            target.read().unwrap().name
+</span><span class="boring">        ))
+</span><span class="boring">        .await;
+</span><span class="boring">
+</span><span class="boring">        wait_time(STEP_DELAY).await;
+</span><span class="boring">    }
+</span><span class="boring">    cast
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn fire_spell_effect(target: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    // Run this effect for 2 battle turns.
+</span><span class="boring">    for index in 0..2 {
+</span><span class="boring">        {
+</span><span class="boring">            // Deal high damage to target.
+</span><span class="boring">            let mut target = target.write().unwrap();
+</span><span class="boring">            target.health = target.health.saturating_sub(20).max(0);
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        log(format!(
+</span><span class="boring">            "Fire status damage dealt to {} ({}/2)",
+</span><span class="boring">            target.read().unwrap().name,
+</span><span class="boring">            index + 1,
+</span><span class="boring">        ))
+</span><span class="boring">        .await;
+</span><span class="boring">
+</span><span class="boring">        // Wait until next turn to apply next tick of damage.
+</span><span class="boring">        next_turn().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn cure_spell(target: AsyncShared&lt;Character&gt;) -&gt; bool {
+</span><span class="boring">    let cast = {
+</span><span class="boring">        let mut target = target.write().unwrap();
+</span><span class="boring">        if let Some(mana) = target.mana.checked_sub(25) {
+</span><span class="boring">            target.mana = mana;
+</span><span class="boring">            target.health = (target.health + 25).min(HEALTH_CAPACITY);
+</span><span class="boring">            true
+</span><span class="boring">        } else {
+</span><span class="boring">            false
+</span><span class="boring">        }
+</span><span class="boring">    };
+</span><span class="boring">
+</span><span class="boring">    if cast {
+</span><span class="boring">        log(format!(
+</span><span class="boring">            "{} casts cure spell on itself",
+</span><span class="boring">            target.read().unwrap().name
+</span><span class="boring">        ))
+</span><span class="boring">        .await;
+</span><span class="boring">
+</span><span class="boring">        wait_time(STEP_DELAY).await;
+</span><span class="boring">    }
+</span><span class="boring">    cast
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">const ACTIONS: [Action; 6] = [
+</span><span class="boring">    Action::SkipTurn,
+</span><span class="boring">    Action::Forfeit,
+</span><span class="boring">    Action::SwordSwing,
+</span><span class="boring">    Action::PoisonSpell,
+</span><span class="boring">    Action::FireSpell,
+</span><span class="boring">    Action::CureSpell,
+</span><span class="boring">];
+</span><span class="boring">
+</span><span class="boring">#[derive(Clone, Copy, PartialEq, Eq)]
+</span><span class="boring">enum Action {
+</span><span class="boring">    SkipTurn,
+</span><span class="boring">    Forfeit,
+</span><span class="boring">    SwordSwing,
+</span><span class="boring">    PoisonSpell,
+</span><span class="boring">    FireSpell,
+</span><span class="boring">    CureSpell,
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl std::fmt::Display for Action {
+</span><span class="boring">    fn fmt(&amp;self, f: &amp;mut std::fmt::Formatter&lt;'_&gt;) -&gt; std::fmt::Result {
+</span><span class="boring">        let text = match self {
+</span><span class="boring">            Action::SkipTurn =&gt; "Skip Turn",
+</span><span class="boring">            Action::Forfeit =&gt; "Forfeit",
+</span><span class="boring">            Action::SwordSwing =&gt; "Sword Swing",
+</span><span class="boring">            Action::PoisonSpell =&gt; "Poison Spell",
+</span><span class="boring">            Action::FireSpell =&gt; "Fire Spell",
+</span><span class="boring">            Action::CureSpell =&gt; "Cure Spell",
+</span><span class="boring">        };
+</span><span class="boring">        write!(f, "{}", text)
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">trait UiScreen {
+</span><span class="boring">    #[allow(unused_variables)]
+</span><span class="boring">    fn update(&amp;mut self, events: &amp;[Event], selected_action: &amp;mut Option&lt;Action&gt;) {}
+</span><span class="boring">
+</span><span class="boring">    #[allow(unused_variables)]
+</span><span class="boring">    fn render(&amp;self, terminal: &amp;mut Terminal, log: &amp;[String]) {}
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">struct LogsScreen;
+</span><span class="boring">
+</span><span class="boring">impl UiScreen for LogsScreen {
+</span><span class="boring">    fn render(&amp;self, terminal: &amp;mut Terminal, log: &amp;[String]) {
+</span><span class="boring">        let (w, h) = size().unwrap();
+</span><span class="boring">        let mut y = 0;
+</span><span class="boring">
+</span><span class="boring">        for (index, text) in log.iter().rev().enumerate() {
+</span><span class="boring">            let text = text_wrap(text, w as usize);
+</span><span class="boring">            let size = text_size(&amp;text);
+</span><span class="boring">            if y + size.y &gt; h as usize {
+</span><span class="boring">                break;
+</span><span class="boring">            }
+</span><span class="boring">
+</span><span class="boring">            let text = if index == 0 {
+</span><span class="boring">                text.white().bold()
+</span><span class="boring">            } else {
+</span><span class="boring">                text.white().italic()
+</span><span class="boring">            };
+</span><span class="boring">            terminal.display([0, y as _], text);
+</span><span class="boring">            y += size.y + 1;
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">#[derive(Default)]
+</span><span class="boring">struct TakeActionScreen {
+</span><span class="boring">    selected_index: usize,
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl UiScreen for TakeActionScreen {
+</span><span class="boring">    fn update(&amp;mut self, events: &amp;[Event], selected_action: &amp;mut Option&lt;Action&gt;) {
+</span><span class="boring">        if is_key_pressed(events, KeyCode::Up) {
+</span><span class="boring">            self.selected_index = (self.selected_index + ACTIONS.len() - 1) % ACTIONS.len();
+</span><span class="boring">        } else if is_key_pressed(events, KeyCode::Down) {
+</span><span class="boring">            self.selected_index = (self.selected_index + 1) % ACTIONS.len();
+</span><span class="boring">        } else if is_key_pressed(events, KeyCode::Enter) {
+</span><span class="boring">            *selected_action = Some(ACTIONS[self.selected_index]);
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    fn render(&amp;self, terminal: &amp;mut Terminal, _log: &amp;[String]) {
+</span><span class="boring">        let (w, _) = size().unwrap();
+</span><span class="boring">        let mut y = 0;
+</span><span class="boring">
+</span><span class="boring">        let text = text_wrap("Your turn, take an action:", w as usize);
+</span><span class="boring">        let size = text_size(&amp;text);
+</span><span class="boring">
+</span><span class="boring">        terminal.display([0, y as _], text.green());
+</span><span class="boring">
+</span><span class="boring">        y += size.y + 1;
+</span><span class="boring">
+</span><span class="boring">        for (index, action) in ACTIONS.iter().enumerate() {
+</span><span class="boring">            let text = if index == self.selected_index {
+</span><span class="boring">                format!("&gt; {}", action)
+</span><span class="boring">            } else {
+</span><span class="boring">                format!("  {}", action)
+</span><span class="boring">            };
+</span><span class="boring">
+</span><span class="boring">            let text = text_wrap(&amp;text, w as usize);
+</span><span class="boring">            let size = text_size(&amp;text);
+</span><span class="boring">
+</span><span class="boring">            let text = if index == self.selected_index {
+</span><span class="boring">                text.black().on_white().bold()
+</span><span class="boring">            } else {
+</span><span class="boring">                text.white().on_dark_grey().italic()
+</span><span class="boring">            };
+</span><span class="boring">
+</span><span class="boring">            terminal.display([0, y as _], text);
+</span><span class="boring">            y += size.y + 1;
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">struct Character {
+</span><span class="boring">    name: String,
+</span><span class="boring">    health: usize,
+</span><span class="boring">    mana: usize,
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl Character {
+</span><span class="boring">    fn new(name: impl ToString) -&gt; Self {
+</span><span class="boring">        Self {
+</span><span class="boring">            name: name.to_string(),
+</span><span class="boring">            health: HEALTH_CAPACITY,
+</span><span class="boring">            mana: MANA_CAPACITY,
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn go_to_next_turn() {
+</span><span class="boring">    *meta::&lt;usize&gt;(TURN_INDEX_META)
+</span><span class="boring">        .await
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .write()
+</span><span class="boring">        .unwrap() += 1;
+</span><span class="boring">
+</span><span class="boring">    yield_now().await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn turn_index() -&gt; usize {
+</span><span class="boring">    *meta::&lt;usize&gt;(TURN_INDEX_META)
+</span><span class="boring">        .await
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .read()
+</span><span class="boring">        .unwrap()
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn next_turn() {
+</span><span class="boring">    let index = turn_index().await;
+</span><span class="boring">    while turn_index().await &lt;= index {
+</span><span class="boring">        yield_now().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn events() -&gt; Vec&lt;Event&gt; {
+</span><span class="boring">    meta::&lt;Vec&lt;Event&gt;&gt;(EVENTS_META)
+</span><span class="boring">        .await
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .read()
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .clone()
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_key(key: KeyCode) {
+</span><span class="boring">    loop {
+</span><span class="boring">        let events = events().await;
+</span><span class="boring">        if is_key_pressed(&amp;events, key) {
+</span><span class="boring">            return;
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        // Yield to allow other coroutines to run (we suspend this coroutine).
+</span><span class="boring">        // Without suspending, this coroutine will block entirely and prevent
+</span><span class="boring">        // other coroutines from running in local thread (and all our coroutines
+</span><span class="boring">        // are running in local thread, so deadlock guaranteed).
+</span><span class="boring">        yield_now().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span>async fn selected_action() -&gt; Action {
+    // Change UI to take action screen.
+    // We hold current UI screen reference available in meta storage to be able
+    // to access it at any time during coroutine work.
+    *meta::&lt;Box&lt;dyn UiScreen&gt;&gt;(UI_SCREEN)
+        .await
+        .unwrap()
+        .write()
+        .unwrap() = Box::new(TakeActionScreen::default());
+
+    loop {
+        // Check if an action has been selected from the list.
+        // Currently selected action by the user is stored in meta storage.
+        let action = meta::&lt;Option&lt;Action&gt;&gt;(SELECTED_ACTION_META)
+            .await
+            .unwrap()
+            .write()
+            .unwrap()
+            .take();
+
+        if let Some(action) = action {
+            // Change UI back to logs screen.
+            *meta::&lt;Box&lt;dyn UiScreen&gt;&gt;(UI_SCREEN)
+                .await
+                .unwrap()
+                .write()
+                .unwrap() = Box::new(LogsScreen);
+
+            // Return the selected action.
+            return action;
+        }
+
+        yield_now().await;
+    }
+}
+<span class="boring">
+</span><span class="boring">async fn log(content: impl ToString) {
+</span><span class="boring">    meta::&lt;Vec&lt;String&gt;&gt;(LOG_META)
+</span><span class="boring">        .await
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .write()
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .push(content.to_string());
+</span><span class="boring">
+</span><span class="boring">    yield_now().await;
+</span><span class="boring">}</span></code></pre>
+<p>And this is how our synchronous side manages user-selected action provided to running coroutines:</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">use crossterm::{
+</span><span class="boring">    event::{Event, KeyCode},
+</span><span class="boring">    style::Stylize,
+</span><span class="boring">    terminal::size,
+</span><span class="boring">};
+</span><span class="boring">use moirai::{
+</span><span class="boring">    coroutine::{meta, spawn, wait_time, yield_now},
+</span><span class="boring">    job::JobLocation,
+</span><span class="boring">    jobs::Jobs,
+</span><span class="boring">    third_party::intuicio_data::{managed::DynamicManagedLazy, shared::AsyncShared},
+</span><span class="boring">};
+</span><span class="boring">use moirai_book_samples::{
+</span><span class="boring">    game::{Game, GameState, GameStateChange},
+</span><span class="boring">    terminal::Terminal,
+</span><span class="boring">    utils::{is_key_pressed, text_size, text_wrap},
+</span><span class="boring">};
+</span><span class="boring">use std::time::Duration;
+</span><span class="boring">
+</span><span class="boring">fn main() {
+</span><span class="boring">    Game::new(Jrpg::default()).run_blocking();
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">const EVENTS_META: &amp;str = "~events~";
+</span><span class="boring">const TURN_INDEX_META: &amp;str = "~turn-index~";
+</span><span class="boring">const SELECTED_ACTION_META: &amp;str = "~selected-action~";
+</span><span class="boring">const UI_SCREEN: &amp;str = "~ui-screen~";
+</span><span class="boring">const LOG_META: &amp;str = "~log~";
+</span><span class="boring">const STEP_DELAY: Duration = Duration::from_secs(1);
+</span><span class="boring">const HEALTH_CAPACITY: usize = 100;
+</span><span class="boring">const MANA_CAPACITY: usize = 100;
+</span><span class="boring">
+</span><span class="boring">struct Jrpg {
+</span><span class="boring">    terminal: Terminal,
+</span><span class="boring">    jobs: Jobs,
+</span><span class="boring">    turn_index: usize,
+</span><span class="boring">    ui_screen: Box&lt;dyn UiScreen&gt;,
+</span><span class="boring">    selected_action: Option&lt;Action&gt;,
+</span><span class="boring">    log: Vec&lt;String&gt;,
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl Default for Jrpg {
+</span><span class="boring">    fn default() -&gt; Self {
+</span><span class="boring">        let jobs = Jobs::default();
+</span><span class="boring">
+</span><span class="boring">        let player = AsyncShared::new(Character::new("Player"));
+</span><span class="boring">        let enemy = AsyncShared::new(Character::new("Enemy"));
+</span><span class="boring">
+</span><span class="boring">        jobs.queue()
+</span><span class="boring">            .spawn(JobLocation::Local, battle(player, enemy));
+</span><span class="boring">
+</span><span class="boring">        Self {
+</span><span class="boring">            terminal: Terminal::default(),
+</span><span class="boring">            jobs,
+</span><span class="boring">            turn_index: 0,
+</span><span class="boring">            ui_screen: Box::new(LogsScreen),
+</span><span class="boring">            selected_action: None,
+</span><span class="boring">            log: Default::default(),
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl GameState for Jrpg {
+</span><span class="boring">    fn frame(&amp;mut self, _delta_time: Duration) -&gt; GameStateChange {
+</span><span class="boring">        let mut events = Terminal::events().collect::&lt;Vec&lt;_&gt;&gt;();
+</span><span class="boring">
+</span><span class="boring">        self.ui_screen.update(&amp;events, &amp;mut self.selected_action);
+</span><span class="boring">
+</span><span class="boring">        self.render_system();
+</span><span class="boring">
+</span><span class="boring">        self.coroutines_system(&amp;mut events);
+</span><span class="boring">
+</span><span class="boring">        if is_key_pressed(&amp;events, KeyCode::Esc) {
+</span><span class="boring">            GameStateChange::Quit
+</span><span class="boring">        } else {
+</span><span class="boring">            GameStateChange::None
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl Jrpg {
+</span><span class="boring">    fn render_system(&amp;mut self) {
+</span><span class="boring">        self.terminal.begin_draw(true);
+</span><span class="boring">
+</span><span class="boring">        self.ui_screen.render(&amp;mut self.terminal, &amp;self.log);
+</span><span class="boring">
+</span><span class="boring">        self.terminal.end_draw();
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    fn coroutines_system(&amp;mut self, events: &amp;mut Vec&lt;Event&gt;) {
+</span><span class="boring">        let (events_lazy, _events_lifetime) = DynamicManagedLazy::make(events);
+</span><span class="boring">        let (turn_lazy, _turn_lifetime) = DynamicManagedLazy::make(&amp;mut self.turn_index);
+</span><span class="boring">        let (action_lazy, _action_lifetime) = DynamicManagedLazy::make(&amp;mut self.selected_action);
+</span><span class="boring">        let (ui_screen_lazy, _ui_screen_lifetime) = DynamicManagedLazy::make(&amp;mut self.ui_screen);
+</span><span class="boring">        let (log_lazy, _log_lifetime) = DynamicManagedLazy::make(&amp;mut self.log);
+</span><span class="boring">
+</span><span class="boring">        self.jobs.run_local_with_meta(
+</span><span class="boring">            [
+</span><span class="boring">                (EVENTS_META.into(), events_lazy.into()),
+</span><span class="boring">                (TURN_INDEX_META.into(), turn_lazy.into()),
+</span><span class="boring">                (SELECTED_ACTION_META.into(), action_lazy.into()),
+</span><span class="boring">                (UI_SCREEN.into(), ui_screen_lazy.into()),
+</span><span class="boring">                (LOG_META.into(), log_lazy.into()),
+</span><span class="boring">            ]
+</span><span class="boring">            .into_iter()
+</span><span class="boring">            .collect(),
+</span><span class="boring">        );
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn battle(player: AsyncShared&lt;Character&gt;, enemy: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    log("Battle starts!").await;
+</span><span class="boring">
+</span><span class="boring">    // Battle turns loop.
+</span><span class="boring">    loop {
+</span><span class="boring">        if win_conditions(player.clone(), enemy.clone()).await {
+</span><span class="boring">            break;
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        present_information(player.clone(), enemy.clone()).await;
+</span><span class="boring">
+</span><span class="boring">        player_turn(player.clone(), enemy.clone()).await;
+</span><span class="boring">
+</span><span class="boring">        enemy_turn(enemy.clone(), player.clone()).await;
+</span><span class="boring">
+</span><span class="boring">        go_to_next_turn().await;
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    log("Hit ESC to exit the game!").await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn win_conditions(player: AsyncShared&lt;Character&gt;, enemy: AsyncShared&lt;Character&gt;) -&gt; bool {
+</span><span class="boring">    if enemy.read().unwrap().health == 0 {
+</span><span class="boring">        log("Enemy has been defeated! You win!").await;
+</span><span class="boring">        true
+</span><span class="boring">    } else if player.read().unwrap().health == 0 {
+</span><span class="boring">        log("Player has been defeated! Game over.").await;
+</span><span class="boring">        true
+</span><span class="boring">    } else {
+</span><span class="boring">        false
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn present_information(player: AsyncShared&lt;Character&gt;, enemy: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    log(format!(
+</span><span class="boring">        "* New turn #{}\n\
+</span><span class="boring">        - Player health: {}\n\
+</span><span class="boring">        - Player mana: {}\n\
+</span><span class="boring">        - Enemy health: {}",
+</span><span class="boring">        turn_index().await + 1,
+</span><span class="boring">        player.read().unwrap().health,
+</span><span class="boring">        player.read().unwrap().mana,
+</span><span class="boring">        enemy.read().unwrap().health,
+</span><span class="boring">    ))
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    wait_time(STEP_DELAY).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn player_turn(player: AsyncShared&lt;Character&gt;, enemy: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    log("* Player turn.\nHit ENTER to take an action!").await;
+</span><span class="boring">
+</span><span class="boring">    wait_for_key(KeyCode::Enter).await;
+</span><span class="boring">
+</span><span class="boring">    loop {
+</span><span class="boring">        match selected_action().await {
+</span><span class="boring">            Action::SkipTurn =&gt; {
+</span><span class="boring">                wait_time(STEP_DELAY).await;
+</span><span class="boring">                return;
+</span><span class="boring">            }
+</span><span class="boring">            Action::Forfeit =&gt; {
+</span><span class="boring">                player.write().unwrap().health = 0;
+</span><span class="boring">                yield_now().await;
+</span><span class="boring">                return;
+</span><span class="boring">            }
+</span><span class="boring">            Action::SwordSwing =&gt; {
+</span><span class="boring">                sword_swing(player.clone(), enemy.clone()).await;
+</span><span class="boring">                return;
+</span><span class="boring">            }
+</span><span class="boring">            Action::PoisonSpell =&gt; {
+</span><span class="boring">                if poison_spell(player.clone(), enemy.clone()).await {
+</span><span class="boring">                    return;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">            Action::FireSpell =&gt; {
+</span><span class="boring">                if fire_spell(player.clone(), enemy.clone()).await {
+</span><span class="boring">                    return;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">            Action::CureSpell =&gt; {
+</span><span class="boring">                if cure_spell(player.clone()).await {
+</span><span class="boring">                    return;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        yield_now().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn enemy_turn(enemy: AsyncShared&lt;Character&gt;, player: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    log("* Enemy turn").await;
+</span><span class="boring">
+</span><span class="boring">    wait_time(STEP_DELAY).await;
+</span><span class="boring">
+</span><span class="boring">    let action_probabilities = [
+</span><span class="boring">        (4, Action::SwordSwing),
+</span><span class="boring">        (2, Action::PoisonSpell),
+</span><span class="boring">        (1, Action::FireSpell),
+</span><span class="boring">        (
+</span><span class="boring">            if enemy.read().unwrap().health &lt; 50 {
+</span><span class="boring">                4
+</span><span class="boring">            } else {
+</span><span class="boring">                1
+</span><span class="boring">            },
+</span><span class="boring">            Action::CureSpell,
+</span><span class="boring">        ),
+</span><span class="boring">    ];
+</span><span class="boring">
+</span><span class="boring">    loop {
+</span><span class="boring">        match select_random_action(&amp;action_probabilities) {
+</span><span class="boring">            Action::SwordSwing =&gt; {
+</span><span class="boring">                sword_swing(enemy.clone(), player.clone()).await;
+</span><span class="boring">                return;
+</span><span class="boring">            }
+</span><span class="boring">            Action::PoisonSpell =&gt; {
+</span><span class="boring">                if poison_spell(enemy.clone(), player.clone()).await {
+</span><span class="boring">                    return;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">            Action::FireSpell =&gt; {
+</span><span class="boring">                if fire_spell(enemy.clone(), player.clone()).await {
+</span><span class="boring">                    return;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">            Action::CureSpell =&gt; {
+</span><span class="boring">                if cure_spell(enemy.clone()).await {
+</span><span class="boring">                    return;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">            _ =&gt; {
+</span><span class="boring">                wait_time(STEP_DELAY).await;
+</span><span class="boring">                return;
+</span><span class="boring">            }
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        yield_now().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">fn select_random_action(action_probabilities: &amp;[(usize, Action)]) -&gt; Action {
+</span><span class="boring">    let total_weight = action_probabilities
+</span><span class="boring">        .iter()
+</span><span class="boring">        .map(|(weight, _)| *weight)
+</span><span class="boring">        .sum::&lt;usize&gt;();
+</span><span class="boring">    let mut choice = rand::random_range(0..total_weight) % total_weight;
+</span><span class="boring">
+</span><span class="boring">    for (weight, action) in action_probabilities.iter().copied() {
+</span><span class="boring">        if choice &lt; weight {
+</span><span class="boring">            return action;
+</span><span class="boring">        } else {
+</span><span class="boring">            choice -= weight;
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    Action::SkipTurn
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn sword_swing(this: AsyncShared&lt;Character&gt;, target: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    {
+</span><span class="boring">        let mut target = target.write().unwrap();
+</span><span class="boring">        target.health = target.health.saturating_sub(10).max(0);
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    log(format!(
+</span><span class="boring">        "{} swings sword at {}",
+</span><span class="boring">        this.read().unwrap().name,
+</span><span class="boring">        target.read().unwrap().name
+</span><span class="boring">    ))
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    wait_time(STEP_DELAY).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn poison_spell(this: AsyncShared&lt;Character&gt;, target: AsyncShared&lt;Character&gt;) -&gt; bool {
+</span><span class="boring">    let cast = {
+</span><span class="boring">        let mut this = this.write().unwrap();
+</span><span class="boring">        if let Some(mana) = this.mana.checked_sub(30) {
+</span><span class="boring">            this.mana = mana;
+</span><span class="boring">            true
+</span><span class="boring">        } else {
+</span><span class="boring">            false
+</span><span class="boring">        }
+</span><span class="boring">    };
+</span><span class="boring">
+</span><span class="boring">    if cast {
+</span><span class="boring">        spawn(JobLocation::Local, poison_spell_effect(target.clone())).await;
+</span><span class="boring">
+</span><span class="boring">        log(format!(
+</span><span class="boring">            "{} casts poison spell at {}",
+</span><span class="boring">            this.read().unwrap().name,
+</span><span class="boring">            target.read().unwrap().name
+</span><span class="boring">        ))
+</span><span class="boring">        .await;
+</span><span class="boring">
+</span><span class="boring">        wait_time(STEP_DELAY).await;
+</span><span class="boring">    }
+</span><span class="boring">    cast
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn poison_spell_effect(target: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    for index in 0..6 {
+</span><span class="boring">        {
+</span><span class="boring">            let mut target = target.write().unwrap();
+</span><span class="boring">            target.health = target.health.saturating_sub(5).max(0);
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        log(format!(
+</span><span class="boring">            "Poison status damage dealt to {} ({}/6)",
+</span><span class="boring">            target.read().unwrap().name,
+</span><span class="boring">            index + 1,
+</span><span class="boring">        ))
+</span><span class="boring">        .await;
+</span><span class="boring">
+</span><span class="boring">        next_turn().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn fire_spell(this: AsyncShared&lt;Character&gt;, target: AsyncShared&lt;Character&gt;) -&gt; bool {
+</span><span class="boring">    // Attempt to cast the spell by checking and deducting mana.
+</span><span class="boring">    let cast = {
+</span><span class="boring">        let mut this = this.write().unwrap();
+</span><span class="boring">        if let Some(mana) = this.mana.checked_sub(40) {
+</span><span class="boring">            this.mana = mana;
+</span><span class="boring">            true
+</span><span class="boring">        } else {
+</span><span class="boring">            false
+</span><span class="boring">        }
+</span><span class="boring">    };
+</span><span class="boring">
+</span><span class="boring">    if cast {
+</span><span class="boring">        // Spawn the fire spell effect as a concurrent job to be ran in the
+</span><span class="boring">        // background, alongside of battle loop job, and await until it completes.
+</span><span class="boring">        spawn(JobLocation::Local, fire_spell_effect(target.clone())).await;
+</span><span class="boring">
+</span><span class="boring">        log(format!(
+</span><span class="boring">            "{} casts fire spell at {}",
+</span><span class="boring">            this.read().unwrap().name,
+</span><span class="boring">            target.read().unwrap().name
+</span><span class="boring">        ))
+</span><span class="boring">        .await;
+</span><span class="boring">
+</span><span class="boring">        wait_time(STEP_DELAY).await;
+</span><span class="boring">    }
+</span><span class="boring">    cast
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn fire_spell_effect(target: AsyncShared&lt;Character&gt;) {
+</span><span class="boring">    // Run this effect for 2 battle turns.
+</span><span class="boring">    for index in 0..2 {
+</span><span class="boring">        {
+</span><span class="boring">            // Deal high damage to target.
+</span><span class="boring">            let mut target = target.write().unwrap();
+</span><span class="boring">            target.health = target.health.saturating_sub(20).max(0);
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        log(format!(
+</span><span class="boring">            "Fire status damage dealt to {} ({}/2)",
+</span><span class="boring">            target.read().unwrap().name,
+</span><span class="boring">            index + 1,
+</span><span class="boring">        ))
+</span><span class="boring">        .await;
+</span><span class="boring">
+</span><span class="boring">        // Wait until next turn to apply next tick of damage.
+</span><span class="boring">        next_turn().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn cure_spell(target: AsyncShared&lt;Character&gt;) -&gt; bool {
+</span><span class="boring">    let cast = {
+</span><span class="boring">        let mut target = target.write().unwrap();
+</span><span class="boring">        if let Some(mana) = target.mana.checked_sub(25) {
+</span><span class="boring">            target.mana = mana;
+</span><span class="boring">            target.health = (target.health + 25).min(HEALTH_CAPACITY);
+</span><span class="boring">            true
+</span><span class="boring">        } else {
+</span><span class="boring">            false
+</span><span class="boring">        }
+</span><span class="boring">    };
+</span><span class="boring">
+</span><span class="boring">    if cast {
+</span><span class="boring">        log(format!(
+</span><span class="boring">            "{} casts cure spell on itself",
+</span><span class="boring">            target.read().unwrap().name
+</span><span class="boring">        ))
+</span><span class="boring">        .await;
+</span><span class="boring">
+</span><span class="boring">        wait_time(STEP_DELAY).await;
+</span><span class="boring">    }
+</span><span class="boring">    cast
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">const ACTIONS: [Action; 6] = [
+</span><span class="boring">    Action::SkipTurn,
+</span><span class="boring">    Action::Forfeit,
+</span><span class="boring">    Action::SwordSwing,
+</span><span class="boring">    Action::PoisonSpell,
+</span><span class="boring">    Action::FireSpell,
+</span><span class="boring">    Action::CureSpell,
+</span><span class="boring">];
+</span><span class="boring">
+</span><span class="boring">#[derive(Clone, Copy, PartialEq, Eq)]
+</span><span class="boring">enum Action {
+</span><span class="boring">    SkipTurn,
+</span><span class="boring">    Forfeit,
+</span><span class="boring">    SwordSwing,
+</span><span class="boring">    PoisonSpell,
+</span><span class="boring">    FireSpell,
+</span><span class="boring">    CureSpell,
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl std::fmt::Display for Action {
+</span><span class="boring">    fn fmt(&amp;self, f: &amp;mut std::fmt::Formatter&lt;'_&gt;) -&gt; std::fmt::Result {
+</span><span class="boring">        let text = match self {
+</span><span class="boring">            Action::SkipTurn =&gt; "Skip Turn",
+</span><span class="boring">            Action::Forfeit =&gt; "Forfeit",
+</span><span class="boring">            Action::SwordSwing =&gt; "Sword Swing",
+</span><span class="boring">            Action::PoisonSpell =&gt; "Poison Spell",
+</span><span class="boring">            Action::FireSpell =&gt; "Fire Spell",
+</span><span class="boring">            Action::CureSpell =&gt; "Cure Spell",
+</span><span class="boring">        };
+</span><span class="boring">        write!(f, "{}", text)
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">trait UiScreen {
+</span><span class="boring">    #[allow(unused_variables)]
+</span><span class="boring">    fn update(&amp;mut self, events: &amp;[Event], selected_action: &amp;mut Option&lt;Action&gt;) {}
+</span><span class="boring">
+</span><span class="boring">    #[allow(unused_variables)]
+</span><span class="boring">    fn render(&amp;self, terminal: &amp;mut Terminal, log: &amp;[String]) {}
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">struct LogsScreen;
+</span><span class="boring">
+</span><span class="boring">impl UiScreen for LogsScreen {
+</span><span class="boring">    fn render(&amp;self, terminal: &amp;mut Terminal, log: &amp;[String]) {
+</span><span class="boring">        let (w, h) = size().unwrap();
+</span><span class="boring">        let mut y = 0;
+</span><span class="boring">
+</span><span class="boring">        for (index, text) in log.iter().rev().enumerate() {
+</span><span class="boring">            let text = text_wrap(text, w as usize);
+</span><span class="boring">            let size = text_size(&amp;text);
+</span><span class="boring">            if y + size.y &gt; h as usize {
+</span><span class="boring">                break;
+</span><span class="boring">            }
+</span><span class="boring">
+</span><span class="boring">            let text = if index == 0 {
+</span><span class="boring">                text.white().bold()
+</span><span class="boring">            } else {
+</span><span class="boring">                text.white().italic()
+</span><span class="boring">            };
+</span><span class="boring">            terminal.display([0, y as _], text);
+</span><span class="boring">            y += size.y + 1;
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">#[derive(Default)]
+</span><span class="boring">struct TakeActionScreen {
+</span><span class="boring">    selected_index: usize,
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl UiScreen for TakeActionScreen {
+</span>    fn update(&amp;mut self, events: &amp;[Event], selected_action: &amp;mut Option&lt;Action&gt;) {
+        if is_key_pressed(events, KeyCode::Up) {
+            self.selected_index = (self.selected_index + ACTIONS.len() - 1) % ACTIONS.len();
+        } else if is_key_pressed(events, KeyCode::Down) {
+            self.selected_index = (self.selected_index + 1) % ACTIONS.len();
+        } else if is_key_pressed(events, KeyCode::Enter) {
+            *selected_action = Some(ACTIONS[self.selected_index]);
+        }
+    }
+<span class="boring">
+</span><span class="boring">    fn render(&amp;self, terminal: &amp;mut Terminal, _log: &amp;[String]) {
+</span><span class="boring">        let (w, _) = size().unwrap();
+</span><span class="boring">        let mut y = 0;
+</span><span class="boring">
+</span><span class="boring">        let text = text_wrap("Your turn, take an action:", w as usize);
+</span><span class="boring">        let size = text_size(&amp;text);
+</span><span class="boring">
+</span><span class="boring">        terminal.display([0, y as _], text.green());
+</span><span class="boring">
+</span><span class="boring">        y += size.y + 1;
+</span><span class="boring">
+</span><span class="boring">        for (index, action) in ACTIONS.iter().enumerate() {
+</span><span class="boring">            let text = if index == self.selected_index {
+</span><span class="boring">                format!("&gt; {}", action)
+</span><span class="boring">            } else {
+</span><span class="boring">                format!("  {}", action)
+</span><span class="boring">            };
+</span><span class="boring">
+</span><span class="boring">            let text = text_wrap(&amp;text, w as usize);
+</span><span class="boring">            let size = text_size(&amp;text);
+</span><span class="boring">
+</span><span class="boring">            let text = if index == self.selected_index {
+</span><span class="boring">                text.black().on_white().bold()
+</span><span class="boring">            } else {
+</span><span class="boring">                text.white().on_dark_grey().italic()
+</span><span class="boring">            };
+</span><span class="boring">
+</span><span class="boring">            terminal.display([0, y as _], text);
+</span><span class="boring">            y += size.y + 1;
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">struct Character {
+</span><span class="boring">    name: String,
+</span><span class="boring">    health: usize,
+</span><span class="boring">    mana: usize,
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl Character {
+</span><span class="boring">    fn new(name: impl ToString) -&gt; Self {
+</span><span class="boring">        Self {
+</span><span class="boring">            name: name.to_string(),
+</span><span class="boring">            health: HEALTH_CAPACITY,
+</span><span class="boring">            mana: MANA_CAPACITY,
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn go_to_next_turn() {
+</span><span class="boring">    *meta::&lt;usize&gt;(TURN_INDEX_META)
+</span><span class="boring">        .await
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .write()
+</span><span class="boring">        .unwrap() += 1;
+</span><span class="boring">
+</span><span class="boring">    yield_now().await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn turn_index() -&gt; usize {
+</span><span class="boring">    *meta::&lt;usize&gt;(TURN_INDEX_META)
+</span><span class="boring">        .await
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .read()
+</span><span class="boring">        .unwrap()
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn next_turn() {
+</span><span class="boring">    let index = turn_index().await;
+</span><span class="boring">    while turn_index().await &lt;= index {
+</span><span class="boring">        yield_now().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn events() -&gt; Vec&lt;Event&gt; {
+</span><span class="boring">    meta::&lt;Vec&lt;Event&gt;&gt;(EVENTS_META)
+</span><span class="boring">        .await
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .read()
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .clone()
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_key(key: KeyCode) {
+</span><span class="boring">    loop {
+</span><span class="boring">        let events = events().await;
+</span><span class="boring">        if is_key_pressed(&amp;events, key) {
+</span><span class="boring">            return;
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        // Yield to allow other coroutines to run (we suspend this coroutine).
+</span><span class="boring">        // Without suspending, this coroutine will block entirely and prevent
+</span><span class="boring">        // other coroutines from running in local thread (and all our coroutines
+</span><span class="boring">        // are running in local thread, so deadlock guaranteed).
+</span><span class="boring">        yield_now().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn selected_action() -&gt; Action {
+</span><span class="boring">    // Change UI to take action screen.
+</span><span class="boring">    // We hold current UI screen reference available in meta storage to be able
+</span><span class="boring">    // to access it at any time during coroutine work.
+</span><span class="boring">    *meta::&lt;Box&lt;dyn UiScreen&gt;&gt;(UI_SCREEN)
+</span><span class="boring">        .await
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .write()
+</span><span class="boring">        .unwrap() = Box::new(TakeActionScreen::default());
+</span><span class="boring">
+</span><span class="boring">    loop {
+</span><span class="boring">        // Check if an action has been selected from the list.
+</span><span class="boring">        // Currently selected action by the user is stored in meta storage.
+</span><span class="boring">        let action = meta::&lt;Option&lt;Action&gt;&gt;(SELECTED_ACTION_META)
+</span><span class="boring">            .await
+</span><span class="boring">            .unwrap()
+</span><span class="boring">            .write()
+</span><span class="boring">            .unwrap()
+</span><span class="boring">            .take();
+</span><span class="boring">
+</span><span class="boring">        if let Some(action) = action {
+</span><span class="boring">            // Change UI back to logs screen.
+</span><span class="boring">            *meta::&lt;Box&lt;dyn UiScreen&gt;&gt;(UI_SCREEN)
+</span><span class="boring">                .await
+</span><span class="boring">                .unwrap()
+</span><span class="boring">                .write()
+</span><span class="boring">                .unwrap() = Box::new(LogsScreen);
+</span><span class="boring">
+</span><span class="boring">            // Return the selected action.
+</span><span class="boring">            return action;
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        yield_now().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn log(content: impl ToString) {
+</span><span class="boring">    meta::&lt;Vec&lt;String&gt;&gt;(LOG_META)
+</span><span class="boring">        .await
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .write()
+</span><span class="boring">        .unwrap()
+</span><span class="boring">        .push(content.to_string());
+</span><span class="boring">
+</span><span class="boring">    yield_now().await;
+</span><span class="boring">}</span></code></pre>
+<p>This method of a <code>TakeActionScreen</code> is then called every game frame.</p>
+<p>Effectively, we have showed shared state communication between traditional game logic and running coroutines.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../../core/jrpg/status-effects.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+                            <a rel="next prefetch" href="../../core/primitives.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../../core/jrpg/status-effects.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+                    <a rel="next prefetch" href="../../core/primitives.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../../mark-09e88c2c.min.js"></script>
+        <script src="../../searcher-c2a407aa.js"></script>
+
+        <script src="../../clipboard-1626706a.min.js"></script>
+        <script src="../../highlight-abc7f01d.js"></script>
+        <script src="../../book-a0b12cfe.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

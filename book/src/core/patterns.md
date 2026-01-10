@@ -1,3 +1,0 @@
-# Coroutine orchestration patterns
-
-> TODO
