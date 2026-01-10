@@ -69,6 +69,10 @@ Coroutines code at the async function building blocks level may also end up ugly
 What makes it ugly is that `this.write().unwrap()` accessor, which is needed for accessing data that's essentially smart pointers, in order to make async compilation happy about lifetime of objects and their mutability (more about it in later chapters).
 
 > Honestly, this is my personal grudge towards async in Rust, that you will need to use smart pointers, accessed especially like that, because if you operate on shared state instead of moving data in and out of future, you would want to access said data also outside of coroutine in per-frame game systems. So no prospect for win here.
+>
+> This is not a problem of async itself, but comes from requirements of multithreaded async runtimes, so in the end when you _need_ shared state (instead of sending it around), you _need_ smart pointers, and therefore your code ends up usually uglier.
+>
+> This doesn't happen when you use singlethreded runtimes, but that has less coverage on average, so..
 
 The only redeeming value here is that this seeming uglyness is hidden from the user most of the times, as user mostly just calls this function in a timeline, not necessarily needing to dive into its code to figure out the state flow, as states flow is directed at the caller location, not in the function.
 
@@ -96,7 +100,7 @@ There is no state exclusive to this coroutine that needs to be serialized, as it
 
 The only thing we would like to serialize here would be a point between which states enemy is in its fight pattern.
 
-> Although games usually save game at safe checkpoints, outside of battles, because that's another category of problems in general, wether we do sync or async game logic.
+> Although games usually save game at safe checkpoints, outside of battles, because that's another category of problems in general, whether we do sync or async game logic.
 
 ## Where coroutines **do** belong
 
@@ -120,11 +124,11 @@ Which makes sense for long lived tasks, such as:
 
 - _Sometimes_ **AI action patterns**
 
-    Where user should be able to learn them in order to anticipate NPC's next move for advantage. It gets less useful the more AI is asset-driven, then coroutines might end up actually worsening the readability, but YMMV.
+    Where player should be able to learn them in order to anticipate NPC's next move for advantage. It gets less useful the more AI is asset-driven, then coroutines might end up actually worsening the readability, but YMMV.
 
 - _Sometimes_ **Quests**
 
-    Where player is expected to do concrete actions, and/or specific game events should happen. But just like with AI action patterns, this also makes less coroutines less useful the more asset-driven quests system is.
+    Where player is expected to do concrete actions, and/or specific game events should happen. But just like with AI action patterns, this also makes coroutines less useful the more asset-driven quests system is.
 
 - **Scripted behaviors**
 

@@ -8,12 +8,12 @@ Let's remind ourselves the player turn:
 {{#rustdoc_include ../../../samples/examples/moirai_jrpg_battle.rs:player-turn}}
 ```
 
-There are two things interesting us:
+There are two things interesting to us:
 
 - `wait_for_key()`
 - `selected_action()`
 
-Waiting for turn requires us to check for events if there is a specific key pressed event.
+Waiting for key requires us to check for events if there is a specific key pressed event.
 
 ```rust,no_run
 {{#rustdoc_include ../../../samples/examples/moirai_jrpg_battle.rs:wait-for-key}}

@@ -14,7 +14,7 @@ Here is how all of that could be expressed as async action timeline:
 
 Action timelines, or coroutines as game developers tends to call them, are used to describe async logic flow in more sequential (to be more precise: procedural) way, reducing suspension and continuation boundary to single place (`.await`), instead of traditional reactive, scattered and manual state machine management.
 
-> It's worth noting that neighter of those is better than the other - they both express same end goal, but in different ways,  and we shouldn't feel guilty for using one over another.
+> It's worth noting that neihter of those is better than the other - they both express same end goal, but in different ways,  and we shouldn't feel guilty for using one over another.
 
 Coroutines allow constructing such state machines in more procedural way in code, automatically, as suspension and continuation is a first class concept in async, which covers perfectly the declaration and execution part of work that's spread across time, but not across codebase - a state machine that we don't need to handle manually, built for us by the compiler from single code block.
 
