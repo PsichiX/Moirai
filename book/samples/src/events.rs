@@ -24,6 +24,56 @@ impl<T: Send + 'static> Events<T> {
     }
 }
 
+pub mod mpmc {
+    use moirai::coroutine::yield_now;
+
+    use super::*;
+    use std::collections::VecDeque;
+
+    pub fn channel<T: Send + 'static>() -> (Sender<T>, Receiver<T>) {
+        let shared = AsyncShared::new(Default::default());
+        (
+            Sender {
+                shared: shared.clone(),
+            },
+            Receiver { shared },
+        )
+    }
+
+    pub struct Sender<T: Send + 'static> {
+        shared: AsyncShared<VecDeque<T>>,
+    }
+
+    impl<T: Send + 'static> Sender<T> {
+        pub async fn send(&self, value: T) {
+            loop {
+                if let Some(mut shared) = self.shared.write() {
+                    shared.push_back(value);
+                    return;
+                }
+                yield_now().await;
+            }
+        }
+    }
+
+    pub struct Receiver<T: Send + 'static> {
+        shared: AsyncShared<VecDeque<T>>,
+    }
+
+    impl<T: Send + 'static> Receiver<T> {
+        pub async fn receive(&self) -> T {
+            loop {
+                if let Some(mut shared) = self.shared.write()
+                    && let Some(value) = shared.pop_front()
+                {
+                    return value;
+                }
+                yield_now().await;
+            }
+        }
+    }
+}
+
 pub mod oneshot {
     use super::*;
 
@@ -31,29 +81,29 @@ pub mod oneshot {
         let shared = AsyncShared::new(None);
         (
             Sender {
-                sender: shared.clone(),
+                shared: shared.clone(),
             },
-            Receiver { receiver: shared },
+            Receiver { shared },
         )
     }
 
     pub struct Sender<T: Send + 'static> {
-        sender: AsyncShared<Option<T>>,
+        shared: AsyncShared<Option<T>>,
     }
 
     impl<T: Send + 'static> Sender<T> {
         pub fn send(&self, value: T) {
-            *self.sender.write().unwrap() = Some(value);
+            *self.shared.write().unwrap() = Some(value);
         }
     }
 
     pub struct Receiver<T: Send + 'static> {
-        receiver: AsyncShared<Option<T>>,
+        shared: AsyncShared<Option<T>>,
     }
 
     impl<T: Send + 'static> Receiver<T> {
         pub fn try_recv(&self) -> Option<T> {
-            self.receiver.write().unwrap().take()
+            self.shared.write().unwrap().take()
         }
     }
 }

@@ -21,10 +21,10 @@
     - [General game loop model](./usage/integration/loop-model.md)
     <!-- - [Macroquad example](./integration/macroquad.md) -->
     <!-- - [Bevy example](./integration/bevy.md) -->
-  <!-- - [Saving and loading running jobs](./usage/durable.md) -->
 - [Advanced topics](./advanced/self.md)
   - [Async under-the-hood from gamedev POV](./advanced/underthehood)
   - [Debugging and timeline tracing](./advanced/debugging.md)
+  - [Saving and loading running jobs](./usage/durable.md)
   - [Common bugs and anti-patterns](./advanced/anti-patterns.md)
   - [Architecture without hell](./advanced/architecture.md)
   - [Custom runtimes](./advanced/custom-runtimes.md)
