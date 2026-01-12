@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "ayu";
             const default_dark_theme = "ayu";
-            window.path_to_searchindex_js = "../searchindex-9a7fb58d.js";
+            window.path_to_searchindex_js = "../searchindex-2878d52a.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-ced68be6.js"></script>
+        <script src="../toc-35ad9a92.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -175,9 +175,139 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="helpful-coroutine-primitives"><a class="header" href="#helpful-coroutine-primitives">Helpful coroutine primitives</a></h1>
+<p>While building suspendable game logic, it’s great to build from smaller building blocks. We are about to list most helpful blocks every game-oriented async runtime should provide in one way or another, in order to let us not care much about internal work of such blocks.</p>
+<h2 id="yielding-control"><a class="header" href="#yielding-control">Yielding control</a></h2>
 <blockquote>
-<p>TODO</p>
+<p>You know them, you love them - <code>yield_now()</code>.</p>
 </blockquote>
+<p>This is the core of every runtime building blocks, as it does nothing more than just tells runtime that your async job can just pause and let other coroutines continue their part of work. Without it, coroutines could block game frame for longer than it needs to, therefore consuming precious frame time that’s required the most for game systems.</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>async {
+    for index in 0..10 {
+        println!("Iteration: {index}");
+        yield_now().await;
+    }
+}
+<span class="boring">}</span></code></pre>
+<h2 id="time-based-waiting"><a class="header" href="#time-based-waiting">Time-based waiting</a></h2>
+<blockquote>
+<ul>
+<li><code>wait_for_next_tick()</code>.</li>
+<li><code>wait_ticks(&lt;N&gt;)</code>.</li>
+<li><code>wait_duration(&lt;TIME&gt;)</code>.</li>
+</ul>
+</blockquote>
+<p>They won’t progress until specific time or frame counter increases enough times. Useful for describing explicit deferral of work in game time, like cutscenes, scripted behavior or splitting heavy computation for example.</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>async {
+    for step in 0..10 {
+        println!("Step: {index}");
+        wait_duration(Duration::from_secs(1)).await;
+    }
+}
+<span class="boring">}</span></code></pre>
+<h2 id="event-based-waiting"><a class="header" href="#event-based-waiting">Event-based waiting</a></h2>
+<blockquote>
+<ul>
+<li><code>wait_for_message(&lt;RECEIVER&gt;)</code>.</li>
+<li><code>wait_for_notification(&lt;NOTIFIER&gt;)</code>.</li>
+</ul>
+</blockquote>
+<p>They expect to progress only after certain signal from game systems or other async work gets received. Useful especially for communication between parts of the game, like quests or entire UI action chains (for example: connecting to multiplayer game in main menu).</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>async {
+    while let Some(message) = wait_for_message(&amp;game_events).await {
+        message.execute();
+    }
+}
+<span class="boring">}</span></code></pre>
+<h2 id="spawning-async-work"><a class="header" href="#spawning-async-work">Spawning async work</a></h2>
+<blockquote>
+<p>The bread and butter of concurrency - <code>spawn(&lt;ASYNC WORK&gt;)</code>.</p>
+</blockquote>
+<p>It allows to spawn new async work as coroutine, making it run in the background, being polled at specific point in a game frame, or in another thread when using multithreaded runtimes.</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>async fn move_towards(object: GameObject, position: Vec2) {
+    let mut factor = 0.0;
+    let from = object.position;
+    loop {
+        factor = (factor + delta_time()).clamp(0.0, 1.0);
+        object.position = from.lerp(position, factor);
+        next_frame().await;
+    }
+}
+
+spawn(async move {
+    move_towards(game_object, target_position).await;
+});
+<span class="boring">}</span></code></pre>
+<h2 id="concurrent-processing"><a class="header" href="#concurrent-processing">Concurrent processing</a></h2>
+<blockquote>
+<ul>
+<li><code>wait_for_any([&lt;ASYNC WORK&gt;])</code> (race).</li>
+<li><code>wait_for_all([&lt;ASYNC WORK&gt;])</code> (join).</li>
+<li>Sometimes <code>select!</code></li>
+</ul>
+</blockquote>
+<p>Primitives like that tend to accept set of async work and “run” them at the same time, usually with expectation that all or some of them must end, in order to continue. Honestly, <code>select!</code> deserves an entire chapter on it’s own, as it’s rather a more rich but also can be more confusing primitive to work with, but this is not the right place to explain its inner workings.</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>async {
+    // Character should reload gun while moving towards target.
+    // If any of those end up quicker, we wait for all.
+    wait_for_all([
+        move_towards(game_object, target_position),
+        reload_gun(),
+    ]).await;
+}
+<span class="boring">}</span></code></pre>
+<h2 id="cancellation"><a class="header" href="#cancellation">Cancellation</a></h2>
+<blockquote>
+<ul>
+<li><code>CancelToken</code>.</li>
+<li><code>is_cancelled(&lt;TOKEN&gt;)</code>.</li>
+</ul>
+</blockquote>
+<p>Allows to define a way to tell some work from any point in a program, that we don’t want to run some work anymore, and then that work, when it finds it’s meaningful, can ask if it was instructed to be cancelled and stop immediatelly.</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let token = CancelToken::default();
+let token2 = token.clone();
+
+spawn(async move {
+    // Character moves towards target, but if player tells it to stop, it does
+    // it immediatelly.
+    wait_for_any([
+        move_towards(game_object, target_position),
+        token2,
+    ]).await;
+});
+
+token.cancel();
+<span class="boring">}</span></code></pre>
+<h2 id="direct-polling-points-in-game-frame"><a class="header" href="#direct-polling-points-in-game-frame">Direct polling points in game frame</a></h2>
+<p>While runtimes usually provide a single async work queue, that gets a single point in game frame, where we explicitly progress pending work, i’ve found that providing an ability to define work queues allows better cooperation with game systems ordering. Think: you might wanna do some work before physics step or after regular game objects update.</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Game frame loop.
+loop {
+    before_physics_queue.run();
+    physics_system();
+    game_object_update_system();
+    after_update_queue.run();
+}
+<span class="boring">}</span></code></pre>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Tween game object position to position in time.
+before_physics_queue.spawn(async move {
+    move_towards(game_object, target_position).await;
+});
+<span class="boring">}</span></code></pre>
 
                     </main>
 

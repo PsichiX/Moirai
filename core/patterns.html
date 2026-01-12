@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "ayu";
             const default_dark_theme = "ayu";
-            window.path_to_searchindex_js = "../searchindex-9a7fb58d.js";
+            window.path_to_searchindex_js = "../searchindex-2878d52a.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-ced68be6.js"></script>
+        <script src="../toc-35ad9a92.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -175,9 +175,1630 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="coroutine-orchestration-patterns"><a class="header" href="#coroutine-orchestration-patterns">Coroutine orchestration patterns</a></h1>
+<p>In this chapter we will be showing you patterns widely used to manage coroutines.</p>
+<p>Grand rule for good and useful coroutine patterns:</p>
 <blockquote>
-<p>TODO</p>
+<p>Every coroutine must have a clear owner, lifetime and exit condition.</p>
 </blockquote>
+<h2 id="sequential"><a class="header" href="#sequential">Sequential</a></h2>
+<p>You are already familiar with this pattern - we just run coroutines sequentially. The basic and most used way to run your work.</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">use moirai::{
+</span><span class="boring">    coroutine::{CompletionImportance, spawn, wait_time, with_all, with_any, with_importance},
+</span><span class="boring">    job::JobLocation,
+</span><span class="boring">    jobs::Jobs,
+</span><span class="boring">};
+</span><span class="boring">use moirai_book_samples::events::mpmc::channel;
+</span><span class="boring">use std::time::Duration;
+</span><span class="boring">
+</span><span class="boring">fn main() {
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Sequential ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, sequential());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Fire and Forget ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, fire_and_forget());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Parent-Child ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, parent_child());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Wait for All ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, wait_for_all());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Wait for Any ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, wait_for_any());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Wait for Some ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, wait_for_some());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Supervisor ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, supervisor());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Actor ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, actor());
+</span><span class="boring">    });
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">fn example(f: impl FnOnce(&amp;Jobs) + 'static) {
+</span><span class="boring">    let jobs = Jobs::default();
+</span><span class="boring">    f(&amp;jobs);
+</span><span class="boring">    while !jobs.queue().is_empty() {
+</span><span class="boring">        jobs.run_local();
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn sequential() {
+</span>    // Run work sequentially.
+    log("Step 1").await;
+    log("Step 2").await;
+    log("Step 3").await;
+<span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn fire_and_forget() {
+</span><span class="boring">    log("Parent Start").await;
+</span><span class="boring">
+</span><span class="boring">    // Spawn a child job.
+</span><span class="boring">    spawn(JobLocation::Local, async {
+</span><span class="boring">        log("Child Start").await;
+</span><span class="boring">        log("Child End").await;
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    log("Parent End").await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn parent_child() {
+</span><span class="boring">    log("Parent Start").await;
+</span><span class="boring">
+</span><span class="boring">    // Spawn a child job.
+</span><span class="boring">    let child_job = spawn(JobLocation::Local, async {
+</span><span class="boring">        log("Child Start").await;
+</span><span class="boring">        log("Child End").await;
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    log("Parent Await").await;
+</span><span class="boring">
+</span><span class="boring">    // Await the child job to complete before exiting this coroutine.
+</span><span class="boring">    child_job.await;
+</span><span class="boring">
+</span><span class="boring">    log("Parent End").await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_all() {
+</span><span class="boring">    // Run multiple work in parallel and wait for all to complete.
+</span><span class="boring">    with_all(vec![
+</span><span class="boring">        Box::pin(log_delay("Work 1", 100)),
+</span><span class="boring">        Box::pin(log_delay("Work 2", 200)),
+</span><span class="boring">        Box::pin(log_delay("Work 3", 300)),
+</span><span class="boring">    ])
+</span><span class="boring">    .await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_any() {
+</span><span class="boring">    // Run multiple work in parallel and wait until quickest of them completes.
+</span><span class="boring">    with_any(vec![
+</span><span class="boring">        Box::pin(log_delay("Work 1", 100)),
+</span><span class="boring">        Box::pin(log_delay("Work 2", 200)),
+</span><span class="boring">        Box::pin(log_delay("Work 3", 300)),
+</span><span class="boring">    ])
+</span><span class="boring">    .await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_some() {
+</span><span class="boring">    // Run multiple work in parallel and wait until some of them complete, while
+</span><span class="boring">    // ignoring other that didn't had time and were not required to complete.
+</span><span class="boring">    with_importance(vec![
+</span><span class="boring">        CompletionImportance::ignored(Box::pin(log_delay("Work 1", 100))),
+</span><span class="boring">        CompletionImportance::required(Box::pin(log_delay("Work 2", 200))),
+</span><span class="boring">        CompletionImportance::ignored(Box::pin(log_delay("Work 3", 300))),
+</span><span class="boring">    ])
+</span><span class="boring">    .await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn supervisor() {
+</span><span class="boring">    // Spawn a supervisor job that controls retries.
+</span><span class="boring">    let job = spawn(JobLocation::Local, async {
+</span><span class="boring">        // Supervise certain job to automatically restart when it ends unexpectedly.
+</span><span class="boring">        loop {
+</span><span class="boring">            // Spawn a supervised child job.
+</span><span class="boring">            spawn(JobLocation::Local, async {
+</span><span class="boring">                println!("Supervised job started.");
+</span><span class="boring">
+</span><span class="boring">                // Emulate job that can end unexpectedly.
+</span><span class="boring">                wait_time(Duration::from_millis(rand::random_range(100..300))).await;
+</span><span class="boring">            })
+</span><span class="boring">            .await
+</span><span class="boring">            .await;
+</span><span class="boring">        }
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    // Kill supervisor after some time.
+</span><span class="boring">    wait_time(Duration::from_secs(1)).await;
+</span><span class="boring">    job.cancel();
+</span><span class="boring">    job.await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn actor() {
+</span><span class="boring">    // Define message type used for communication with spawned actor.
+</span><span class="boring">    enum Message {
+</span><span class="boring">        Tick,
+</span><span class="boring">        Terminate,
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    // Create communication channel.
+</span><span class="boring">    let (tx, rx) = channel::&lt;Message&gt;();
+</span><span class="boring">
+</span><span class="boring">    // Spawn actor job to run in the background.
+</span><span class="boring">    let child_job = spawn(JobLocation::Local, async move {
+</span><span class="boring">        let mut ticks = 0;
+</span><span class="boring">        loop {
+</span><span class="boring">            // Do some work based on messages received from outside world.
+</span><span class="boring">            let message = rx.receive().await;
+</span><span class="boring">            match message {
+</span><span class="boring">                Message::Tick =&gt; {
+</span><span class="boring">                    ticks += 1;
+</span><span class="boring">                    println!("Ticks: {}", ticks);
+</span><span class="boring">                }
+</span><span class="boring">                Message::Terminate =&gt; {
+</span><span class="boring">                    break;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">        }
+</span><span class="boring">        ticks
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    // Control actor via sending messages.
+</span><span class="boring">    tx.send(Message::Tick).await;
+</span><span class="boring">    wait(300).await;
+</span><span class="boring">
+</span><span class="boring">    tx.send(Message::Tick).await;
+</span><span class="boring">    wait(200).await;
+</span><span class="boring">
+</span><span class="boring">    tx.send(Message::Tick).await;
+</span><span class="boring">    wait(100).await;
+</span><span class="boring">
+</span><span class="boring">    tx.send(Message::Terminate).await;
+</span><span class="boring">    println!("Counted ticks: {}", child_job.await.unwrap());
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn log(message: &amp;str) {
+</span><span class="boring">    log_delay(message, 100).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn log_delay(message: &amp;str, milliseconds: u64) {
+</span><span class="boring">    wait(milliseconds).await;
+</span><span class="boring">    println!("{}", message);
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait(milliseconds: u64) {
+</span><span class="boring">    wait_time(Duration::from_millis(milliseconds)).await;
+</span><span class="boring">}</span></code></pre>
+<h2 id="fire-and-forget"><a class="header" href="#fire-and-forget">Fire and forget</a></h2>
+<p>Spawn some job in the background to run concurently alongside. Be careful, as if this job will end only when it decides, as it is detached from any other job, it effectively has no owner 0 it’s completely independent job.</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">use moirai::{
+</span><span class="boring">    coroutine::{CompletionImportance, spawn, wait_time, with_all, with_any, with_importance},
+</span><span class="boring">    job::JobLocation,
+</span><span class="boring">    jobs::Jobs,
+</span><span class="boring">};
+</span><span class="boring">use moirai_book_samples::events::mpmc::channel;
+</span><span class="boring">use std::time::Duration;
+</span><span class="boring">
+</span><span class="boring">fn main() {
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Sequential ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, sequential());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Fire and Forget ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, fire_and_forget());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Parent-Child ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, parent_child());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Wait for All ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, wait_for_all());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Wait for Any ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, wait_for_any());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Wait for Some ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, wait_for_some());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Supervisor ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, supervisor());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Actor ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, actor());
+</span><span class="boring">    });
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">fn example(f: impl FnOnce(&amp;Jobs) + 'static) {
+</span><span class="boring">    let jobs = Jobs::default();
+</span><span class="boring">    f(&amp;jobs);
+</span><span class="boring">    while !jobs.queue().is_empty() {
+</span><span class="boring">        jobs.run_local();
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn sequential() {
+</span><span class="boring">    // Run work sequentially.
+</span><span class="boring">    log("Step 1").await;
+</span><span class="boring">    log("Step 2").await;
+</span><span class="boring">    log("Step 3").await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn fire_and_forget() {
+</span>    log("Parent Start").await;
+
+    // Spawn a child job.
+    spawn(JobLocation::Local, async {
+        log("Child Start").await;
+        log("Child End").await;
+    })
+    .await;
+
+    log("Parent End").await;
+<span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn parent_child() {
+</span><span class="boring">    log("Parent Start").await;
+</span><span class="boring">
+</span><span class="boring">    // Spawn a child job.
+</span><span class="boring">    let child_job = spawn(JobLocation::Local, async {
+</span><span class="boring">        log("Child Start").await;
+</span><span class="boring">        log("Child End").await;
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    log("Parent Await").await;
+</span><span class="boring">
+</span><span class="boring">    // Await the child job to complete before exiting this coroutine.
+</span><span class="boring">    child_job.await;
+</span><span class="boring">
+</span><span class="boring">    log("Parent End").await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_all() {
+</span><span class="boring">    // Run multiple work in parallel and wait for all to complete.
+</span><span class="boring">    with_all(vec![
+</span><span class="boring">        Box::pin(log_delay("Work 1", 100)),
+</span><span class="boring">        Box::pin(log_delay("Work 2", 200)),
+</span><span class="boring">        Box::pin(log_delay("Work 3", 300)),
+</span><span class="boring">    ])
+</span><span class="boring">    .await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_any() {
+</span><span class="boring">    // Run multiple work in parallel and wait until quickest of them completes.
+</span><span class="boring">    with_any(vec![
+</span><span class="boring">        Box::pin(log_delay("Work 1", 100)),
+</span><span class="boring">        Box::pin(log_delay("Work 2", 200)),
+</span><span class="boring">        Box::pin(log_delay("Work 3", 300)),
+</span><span class="boring">    ])
+</span><span class="boring">    .await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_some() {
+</span><span class="boring">    // Run multiple work in parallel and wait until some of them complete, while
+</span><span class="boring">    // ignoring other that didn't had time and were not required to complete.
+</span><span class="boring">    with_importance(vec![
+</span><span class="boring">        CompletionImportance::ignored(Box::pin(log_delay("Work 1", 100))),
+</span><span class="boring">        CompletionImportance::required(Box::pin(log_delay("Work 2", 200))),
+</span><span class="boring">        CompletionImportance::ignored(Box::pin(log_delay("Work 3", 300))),
+</span><span class="boring">    ])
+</span><span class="boring">    .await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn supervisor() {
+</span><span class="boring">    // Spawn a supervisor job that controls retries.
+</span><span class="boring">    let job = spawn(JobLocation::Local, async {
+</span><span class="boring">        // Supervise certain job to automatically restart when it ends unexpectedly.
+</span><span class="boring">        loop {
+</span><span class="boring">            // Spawn a supervised child job.
+</span><span class="boring">            spawn(JobLocation::Local, async {
+</span><span class="boring">                println!("Supervised job started.");
+</span><span class="boring">
+</span><span class="boring">                // Emulate job that can end unexpectedly.
+</span><span class="boring">                wait_time(Duration::from_millis(rand::random_range(100..300))).await;
+</span><span class="boring">            })
+</span><span class="boring">            .await
+</span><span class="boring">            .await;
+</span><span class="boring">        }
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    // Kill supervisor after some time.
+</span><span class="boring">    wait_time(Duration::from_secs(1)).await;
+</span><span class="boring">    job.cancel();
+</span><span class="boring">    job.await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn actor() {
+</span><span class="boring">    // Define message type used for communication with spawned actor.
+</span><span class="boring">    enum Message {
+</span><span class="boring">        Tick,
+</span><span class="boring">        Terminate,
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    // Create communication channel.
+</span><span class="boring">    let (tx, rx) = channel::&lt;Message&gt;();
+</span><span class="boring">
+</span><span class="boring">    // Spawn actor job to run in the background.
+</span><span class="boring">    let child_job = spawn(JobLocation::Local, async move {
+</span><span class="boring">        let mut ticks = 0;
+</span><span class="boring">        loop {
+</span><span class="boring">            // Do some work based on messages received from outside world.
+</span><span class="boring">            let message = rx.receive().await;
+</span><span class="boring">            match message {
+</span><span class="boring">                Message::Tick =&gt; {
+</span><span class="boring">                    ticks += 1;
+</span><span class="boring">                    println!("Ticks: {}", ticks);
+</span><span class="boring">                }
+</span><span class="boring">                Message::Terminate =&gt; {
+</span><span class="boring">                    break;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">        }
+</span><span class="boring">        ticks
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    // Control actor via sending messages.
+</span><span class="boring">    tx.send(Message::Tick).await;
+</span><span class="boring">    wait(300).await;
+</span><span class="boring">
+</span><span class="boring">    tx.send(Message::Tick).await;
+</span><span class="boring">    wait(200).await;
+</span><span class="boring">
+</span><span class="boring">    tx.send(Message::Tick).await;
+</span><span class="boring">    wait(100).await;
+</span><span class="boring">
+</span><span class="boring">    tx.send(Message::Terminate).await;
+</span><span class="boring">    println!("Counted ticks: {}", child_job.await.unwrap());
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn log(message: &amp;str) {
+</span><span class="boring">    log_delay(message, 100).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn log_delay(message: &amp;str, milliseconds: u64) {
+</span><span class="boring">    wait(milliseconds).await;
+</span><span class="boring">    println!("{}", message);
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait(milliseconds: u64) {
+</span><span class="boring">    wait_time(Duration::from_millis(milliseconds)).await;
+</span><span class="boring">}</span></code></pre>
+<blockquote>
+<p>Be careful when spawning long-lived jobs as they will run for entire runtime lifetime!</p>
+</blockquote>
+<h2 id="parent-child"><a class="header" href="#parent-child">Parent-child</a></h2>
+<p>We spawn some job, but we also await on its result at some point, so currently running job is its child job owner, as it’s a dependent job.</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">use moirai::{
+</span><span class="boring">    coroutine::{CompletionImportance, spawn, wait_time, with_all, with_any, with_importance},
+</span><span class="boring">    job::JobLocation,
+</span><span class="boring">    jobs::Jobs,
+</span><span class="boring">};
+</span><span class="boring">use moirai_book_samples::events::mpmc::channel;
+</span><span class="boring">use std::time::Duration;
+</span><span class="boring">
+</span><span class="boring">fn main() {
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Sequential ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, sequential());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Fire and Forget ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, fire_and_forget());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Parent-Child ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, parent_child());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Wait for All ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, wait_for_all());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Wait for Any ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, wait_for_any());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Wait for Some ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, wait_for_some());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Supervisor ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, supervisor());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Actor ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, actor());
+</span><span class="boring">    });
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">fn example(f: impl FnOnce(&amp;Jobs) + 'static) {
+</span><span class="boring">    let jobs = Jobs::default();
+</span><span class="boring">    f(&amp;jobs);
+</span><span class="boring">    while !jobs.queue().is_empty() {
+</span><span class="boring">        jobs.run_local();
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn sequential() {
+</span><span class="boring">    // Run work sequentially.
+</span><span class="boring">    log("Step 1").await;
+</span><span class="boring">    log("Step 2").await;
+</span><span class="boring">    log("Step 3").await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn fire_and_forget() {
+</span><span class="boring">    log("Parent Start").await;
+</span><span class="boring">
+</span><span class="boring">    // Spawn a child job.
+</span><span class="boring">    spawn(JobLocation::Local, async {
+</span><span class="boring">        log("Child Start").await;
+</span><span class="boring">        log("Child End").await;
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    log("Parent End").await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn parent_child() {
+</span>    log("Parent Start").await;
+
+    // Spawn a child job.
+    let child_job = spawn(JobLocation::Local, async {
+        log("Child Start").await;
+        log("Child End").await;
+    })
+    .await;
+
+    log("Parent Await").await;
+
+    // Await the child job to complete before exiting this coroutine.
+    child_job.await;
+
+    log("Parent End").await;
+<span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_all() {
+</span><span class="boring">    // Run multiple work in parallel and wait for all to complete.
+</span><span class="boring">    with_all(vec![
+</span><span class="boring">        Box::pin(log_delay("Work 1", 100)),
+</span><span class="boring">        Box::pin(log_delay("Work 2", 200)),
+</span><span class="boring">        Box::pin(log_delay("Work 3", 300)),
+</span><span class="boring">    ])
+</span><span class="boring">    .await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_any() {
+</span><span class="boring">    // Run multiple work in parallel and wait until quickest of them completes.
+</span><span class="boring">    with_any(vec![
+</span><span class="boring">        Box::pin(log_delay("Work 1", 100)),
+</span><span class="boring">        Box::pin(log_delay("Work 2", 200)),
+</span><span class="boring">        Box::pin(log_delay("Work 3", 300)),
+</span><span class="boring">    ])
+</span><span class="boring">    .await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_some() {
+</span><span class="boring">    // Run multiple work in parallel and wait until some of them complete, while
+</span><span class="boring">    // ignoring other that didn't had time and were not required to complete.
+</span><span class="boring">    with_importance(vec![
+</span><span class="boring">        CompletionImportance::ignored(Box::pin(log_delay("Work 1", 100))),
+</span><span class="boring">        CompletionImportance::required(Box::pin(log_delay("Work 2", 200))),
+</span><span class="boring">        CompletionImportance::ignored(Box::pin(log_delay("Work 3", 300))),
+</span><span class="boring">    ])
+</span><span class="boring">    .await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn supervisor() {
+</span><span class="boring">    // Spawn a supervisor job that controls retries.
+</span><span class="boring">    let job = spawn(JobLocation::Local, async {
+</span><span class="boring">        // Supervise certain job to automatically restart when it ends unexpectedly.
+</span><span class="boring">        loop {
+</span><span class="boring">            // Spawn a supervised child job.
+</span><span class="boring">            spawn(JobLocation::Local, async {
+</span><span class="boring">                println!("Supervised job started.");
+</span><span class="boring">
+</span><span class="boring">                // Emulate job that can end unexpectedly.
+</span><span class="boring">                wait_time(Duration::from_millis(rand::random_range(100..300))).await;
+</span><span class="boring">            })
+</span><span class="boring">            .await
+</span><span class="boring">            .await;
+</span><span class="boring">        }
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    // Kill supervisor after some time.
+</span><span class="boring">    wait_time(Duration::from_secs(1)).await;
+</span><span class="boring">    job.cancel();
+</span><span class="boring">    job.await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn actor() {
+</span><span class="boring">    // Define message type used for communication with spawned actor.
+</span><span class="boring">    enum Message {
+</span><span class="boring">        Tick,
+</span><span class="boring">        Terminate,
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    // Create communication channel.
+</span><span class="boring">    let (tx, rx) = channel::&lt;Message&gt;();
+</span><span class="boring">
+</span><span class="boring">    // Spawn actor job to run in the background.
+</span><span class="boring">    let child_job = spawn(JobLocation::Local, async move {
+</span><span class="boring">        let mut ticks = 0;
+</span><span class="boring">        loop {
+</span><span class="boring">            // Do some work based on messages received from outside world.
+</span><span class="boring">            let message = rx.receive().await;
+</span><span class="boring">            match message {
+</span><span class="boring">                Message::Tick =&gt; {
+</span><span class="boring">                    ticks += 1;
+</span><span class="boring">                    println!("Ticks: {}", ticks);
+</span><span class="boring">                }
+</span><span class="boring">                Message::Terminate =&gt; {
+</span><span class="boring">                    break;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">        }
+</span><span class="boring">        ticks
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    // Control actor via sending messages.
+</span><span class="boring">    tx.send(Message::Tick).await;
+</span><span class="boring">    wait(300).await;
+</span><span class="boring">
+</span><span class="boring">    tx.send(Message::Tick).await;
+</span><span class="boring">    wait(200).await;
+</span><span class="boring">
+</span><span class="boring">    tx.send(Message::Tick).await;
+</span><span class="boring">    wait(100).await;
+</span><span class="boring">
+</span><span class="boring">    tx.send(Message::Terminate).await;
+</span><span class="boring">    println!("Counted ticks: {}", child_job.await.unwrap());
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn log(message: &amp;str) {
+</span><span class="boring">    log_delay(message, 100).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn log_delay(message: &amp;str, milliseconds: u64) {
+</span><span class="boring">    wait(milliseconds).await;
+</span><span class="boring">    println!("{}", message);
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait(milliseconds: u64) {
+</span><span class="boring">    wait_time(Duration::from_millis(milliseconds)).await;
+</span><span class="boring">}</span></code></pre>
+<h2 id="wait-for-all-join"><a class="header" href="#wait-for-all-join">Wait for all (join)</a></h2>
+<p>Spawning series of jobs that lets you do parallel work, with expectation to get results of them all when all are done.</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">use moirai::{
+</span><span class="boring">    coroutine::{CompletionImportance, spawn, wait_time, with_all, with_any, with_importance},
+</span><span class="boring">    job::JobLocation,
+</span><span class="boring">    jobs::Jobs,
+</span><span class="boring">};
+</span><span class="boring">use moirai_book_samples::events::mpmc::channel;
+</span><span class="boring">use std::time::Duration;
+</span><span class="boring">
+</span><span class="boring">fn main() {
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Sequential ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, sequential());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Fire and Forget ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, fire_and_forget());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Parent-Child ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, parent_child());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Wait for All ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, wait_for_all());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Wait for Any ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, wait_for_any());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Wait for Some ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, wait_for_some());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Supervisor ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, supervisor());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Actor ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, actor());
+</span><span class="boring">    });
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">fn example(f: impl FnOnce(&amp;Jobs) + 'static) {
+</span><span class="boring">    let jobs = Jobs::default();
+</span><span class="boring">    f(&amp;jobs);
+</span><span class="boring">    while !jobs.queue().is_empty() {
+</span><span class="boring">        jobs.run_local();
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn sequential() {
+</span><span class="boring">    // Run work sequentially.
+</span><span class="boring">    log("Step 1").await;
+</span><span class="boring">    log("Step 2").await;
+</span><span class="boring">    log("Step 3").await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn fire_and_forget() {
+</span><span class="boring">    log("Parent Start").await;
+</span><span class="boring">
+</span><span class="boring">    // Spawn a child job.
+</span><span class="boring">    spawn(JobLocation::Local, async {
+</span><span class="boring">        log("Child Start").await;
+</span><span class="boring">        log("Child End").await;
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    log("Parent End").await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn parent_child() {
+</span><span class="boring">    log("Parent Start").await;
+</span><span class="boring">
+</span><span class="boring">    // Spawn a child job.
+</span><span class="boring">    let child_job = spawn(JobLocation::Local, async {
+</span><span class="boring">        log("Child Start").await;
+</span><span class="boring">        log("Child End").await;
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    log("Parent Await").await;
+</span><span class="boring">
+</span><span class="boring">    // Await the child job to complete before exiting this coroutine.
+</span><span class="boring">    child_job.await;
+</span><span class="boring">
+</span><span class="boring">    log("Parent End").await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_all() {
+</span>    // Run multiple work in parallel and wait for all to complete.
+    with_all(vec![
+        Box::pin(log_delay("Work 1", 100)),
+        Box::pin(log_delay("Work 2", 200)),
+        Box::pin(log_delay("Work 3", 300)),
+    ])
+    .await;
+<span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_any() {
+</span><span class="boring">    // Run multiple work in parallel and wait until quickest of them completes.
+</span><span class="boring">    with_any(vec![
+</span><span class="boring">        Box::pin(log_delay("Work 1", 100)),
+</span><span class="boring">        Box::pin(log_delay("Work 2", 200)),
+</span><span class="boring">        Box::pin(log_delay("Work 3", 300)),
+</span><span class="boring">    ])
+</span><span class="boring">    .await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_some() {
+</span><span class="boring">    // Run multiple work in parallel and wait until some of them complete, while
+</span><span class="boring">    // ignoring other that didn't had time and were not required to complete.
+</span><span class="boring">    with_importance(vec![
+</span><span class="boring">        CompletionImportance::ignored(Box::pin(log_delay("Work 1", 100))),
+</span><span class="boring">        CompletionImportance::required(Box::pin(log_delay("Work 2", 200))),
+</span><span class="boring">        CompletionImportance::ignored(Box::pin(log_delay("Work 3", 300))),
+</span><span class="boring">    ])
+</span><span class="boring">    .await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn supervisor() {
+</span><span class="boring">    // Spawn a supervisor job that controls retries.
+</span><span class="boring">    let job = spawn(JobLocation::Local, async {
+</span><span class="boring">        // Supervise certain job to automatically restart when it ends unexpectedly.
+</span><span class="boring">        loop {
+</span><span class="boring">            // Spawn a supervised child job.
+</span><span class="boring">            spawn(JobLocation::Local, async {
+</span><span class="boring">                println!("Supervised job started.");
+</span><span class="boring">
+</span><span class="boring">                // Emulate job that can end unexpectedly.
+</span><span class="boring">                wait_time(Duration::from_millis(rand::random_range(100..300))).await;
+</span><span class="boring">            })
+</span><span class="boring">            .await
+</span><span class="boring">            .await;
+</span><span class="boring">        }
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    // Kill supervisor after some time.
+</span><span class="boring">    wait_time(Duration::from_secs(1)).await;
+</span><span class="boring">    job.cancel();
+</span><span class="boring">    job.await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn actor() {
+</span><span class="boring">    // Define message type used for communication with spawned actor.
+</span><span class="boring">    enum Message {
+</span><span class="boring">        Tick,
+</span><span class="boring">        Terminate,
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    // Create communication channel.
+</span><span class="boring">    let (tx, rx) = channel::&lt;Message&gt;();
+</span><span class="boring">
+</span><span class="boring">    // Spawn actor job to run in the background.
+</span><span class="boring">    let child_job = spawn(JobLocation::Local, async move {
+</span><span class="boring">        let mut ticks = 0;
+</span><span class="boring">        loop {
+</span><span class="boring">            // Do some work based on messages received from outside world.
+</span><span class="boring">            let message = rx.receive().await;
+</span><span class="boring">            match message {
+</span><span class="boring">                Message::Tick =&gt; {
+</span><span class="boring">                    ticks += 1;
+</span><span class="boring">                    println!("Ticks: {}", ticks);
+</span><span class="boring">                }
+</span><span class="boring">                Message::Terminate =&gt; {
+</span><span class="boring">                    break;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">        }
+</span><span class="boring">        ticks
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    // Control actor via sending messages.
+</span><span class="boring">    tx.send(Message::Tick).await;
+</span><span class="boring">    wait(300).await;
+</span><span class="boring">
+</span><span class="boring">    tx.send(Message::Tick).await;
+</span><span class="boring">    wait(200).await;
+</span><span class="boring">
+</span><span class="boring">    tx.send(Message::Tick).await;
+</span><span class="boring">    wait(100).await;
+</span><span class="boring">
+</span><span class="boring">    tx.send(Message::Terminate).await;
+</span><span class="boring">    println!("Counted ticks: {}", child_job.await.unwrap());
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn log(message: &amp;str) {
+</span><span class="boring">    log_delay(message, 100).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn log_delay(message: &amp;str, milliseconds: u64) {
+</span><span class="boring">    wait(milliseconds).await;
+</span><span class="boring">    println!("{}", message);
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait(milliseconds: u64) {
+</span><span class="boring">    wait_time(Duration::from_millis(milliseconds)).await;
+</span><span class="boring">}</span></code></pre>
+<h2 id="wait-for-any-race"><a class="header" href="#wait-for-any-race">Wait for any (race)</a></h2>
+<p>Spawning series of jobs for parallel work, when you only care about result of the fastest job to complete.</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">use moirai::{
+</span><span class="boring">    coroutine::{CompletionImportance, spawn, wait_time, with_all, with_any, with_importance},
+</span><span class="boring">    job::JobLocation,
+</span><span class="boring">    jobs::Jobs,
+</span><span class="boring">};
+</span><span class="boring">use moirai_book_samples::events::mpmc::channel;
+</span><span class="boring">use std::time::Duration;
+</span><span class="boring">
+</span><span class="boring">fn main() {
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Sequential ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, sequential());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Fire and Forget ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, fire_and_forget());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Parent-Child ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, parent_child());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Wait for All ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, wait_for_all());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Wait for Any ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, wait_for_any());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Wait for Some ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, wait_for_some());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Supervisor ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, supervisor());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Actor ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, actor());
+</span><span class="boring">    });
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">fn example(f: impl FnOnce(&amp;Jobs) + 'static) {
+</span><span class="boring">    let jobs = Jobs::default();
+</span><span class="boring">    f(&amp;jobs);
+</span><span class="boring">    while !jobs.queue().is_empty() {
+</span><span class="boring">        jobs.run_local();
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn sequential() {
+</span><span class="boring">    // Run work sequentially.
+</span><span class="boring">    log("Step 1").await;
+</span><span class="boring">    log("Step 2").await;
+</span><span class="boring">    log("Step 3").await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn fire_and_forget() {
+</span><span class="boring">    log("Parent Start").await;
+</span><span class="boring">
+</span><span class="boring">    // Spawn a child job.
+</span><span class="boring">    spawn(JobLocation::Local, async {
+</span><span class="boring">        log("Child Start").await;
+</span><span class="boring">        log("Child End").await;
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    log("Parent End").await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn parent_child() {
+</span><span class="boring">    log("Parent Start").await;
+</span><span class="boring">
+</span><span class="boring">    // Spawn a child job.
+</span><span class="boring">    let child_job = spawn(JobLocation::Local, async {
+</span><span class="boring">        log("Child Start").await;
+</span><span class="boring">        log("Child End").await;
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    log("Parent Await").await;
+</span><span class="boring">
+</span><span class="boring">    // Await the child job to complete before exiting this coroutine.
+</span><span class="boring">    child_job.await;
+</span><span class="boring">
+</span><span class="boring">    log("Parent End").await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_all() {
+</span><span class="boring">    // Run multiple work in parallel and wait for all to complete.
+</span><span class="boring">    with_all(vec![
+</span><span class="boring">        Box::pin(log_delay("Work 1", 100)),
+</span><span class="boring">        Box::pin(log_delay("Work 2", 200)),
+</span><span class="boring">        Box::pin(log_delay("Work 3", 300)),
+</span><span class="boring">    ])
+</span><span class="boring">    .await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_any() {
+</span>    // Run multiple work in parallel and wait until quickest of them completes.
+    with_any(vec![
+        Box::pin(log_delay("Work 1", 100)),
+        Box::pin(log_delay("Work 2", 200)),
+        Box::pin(log_delay("Work 3", 300)),
+    ])
+    .await;
+<span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_some() {
+</span><span class="boring">    // Run multiple work in parallel and wait until some of them complete, while
+</span><span class="boring">    // ignoring other that didn't had time and were not required to complete.
+</span><span class="boring">    with_importance(vec![
+</span><span class="boring">        CompletionImportance::ignored(Box::pin(log_delay("Work 1", 100))),
+</span><span class="boring">        CompletionImportance::required(Box::pin(log_delay("Work 2", 200))),
+</span><span class="boring">        CompletionImportance::ignored(Box::pin(log_delay("Work 3", 300))),
+</span><span class="boring">    ])
+</span><span class="boring">    .await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn supervisor() {
+</span><span class="boring">    // Spawn a supervisor job that controls retries.
+</span><span class="boring">    let job = spawn(JobLocation::Local, async {
+</span><span class="boring">        // Supervise certain job to automatically restart when it ends unexpectedly.
+</span><span class="boring">        loop {
+</span><span class="boring">            // Spawn a supervised child job.
+</span><span class="boring">            spawn(JobLocation::Local, async {
+</span><span class="boring">                println!("Supervised job started.");
+</span><span class="boring">
+</span><span class="boring">                // Emulate job that can end unexpectedly.
+</span><span class="boring">                wait_time(Duration::from_millis(rand::random_range(100..300))).await;
+</span><span class="boring">            })
+</span><span class="boring">            .await
+</span><span class="boring">            .await;
+</span><span class="boring">        }
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    // Kill supervisor after some time.
+</span><span class="boring">    wait_time(Duration::from_secs(1)).await;
+</span><span class="boring">    job.cancel();
+</span><span class="boring">    job.await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn actor() {
+</span><span class="boring">    // Define message type used for communication with spawned actor.
+</span><span class="boring">    enum Message {
+</span><span class="boring">        Tick,
+</span><span class="boring">        Terminate,
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    // Create communication channel.
+</span><span class="boring">    let (tx, rx) = channel::&lt;Message&gt;();
+</span><span class="boring">
+</span><span class="boring">    // Spawn actor job to run in the background.
+</span><span class="boring">    let child_job = spawn(JobLocation::Local, async move {
+</span><span class="boring">        let mut ticks = 0;
+</span><span class="boring">        loop {
+</span><span class="boring">            // Do some work based on messages received from outside world.
+</span><span class="boring">            let message = rx.receive().await;
+</span><span class="boring">            match message {
+</span><span class="boring">                Message::Tick =&gt; {
+</span><span class="boring">                    ticks += 1;
+</span><span class="boring">                    println!("Ticks: {}", ticks);
+</span><span class="boring">                }
+</span><span class="boring">                Message::Terminate =&gt; {
+</span><span class="boring">                    break;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">        }
+</span><span class="boring">        ticks
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    // Control actor via sending messages.
+</span><span class="boring">    tx.send(Message::Tick).await;
+</span><span class="boring">    wait(300).await;
+</span><span class="boring">
+</span><span class="boring">    tx.send(Message::Tick).await;
+</span><span class="boring">    wait(200).await;
+</span><span class="boring">
+</span><span class="boring">    tx.send(Message::Tick).await;
+</span><span class="boring">    wait(100).await;
+</span><span class="boring">
+</span><span class="boring">    tx.send(Message::Terminate).await;
+</span><span class="boring">    println!("Counted ticks: {}", child_job.await.unwrap());
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn log(message: &amp;str) {
+</span><span class="boring">    log_delay(message, 100).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn log_delay(message: &amp;str, milliseconds: u64) {
+</span><span class="boring">    wait(milliseconds).await;
+</span><span class="boring">    println!("{}", message);
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait(milliseconds: u64) {
+</span><span class="boring">    wait_time(Duration::from_millis(milliseconds)).await;
+</span><span class="boring">}</span></code></pre>
+<h2 id="wait-for-some"><a class="header" href="#wait-for-some">Wait for some</a></h2>
+<p>Spawning series of jobs with clear expectations which job results are required and which can be ignored when all required jobs complete - it’s a mix of any and all.</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">use moirai::{
+</span><span class="boring">    coroutine::{CompletionImportance, spawn, wait_time, with_all, with_any, with_importance},
+</span><span class="boring">    job::JobLocation,
+</span><span class="boring">    jobs::Jobs,
+</span><span class="boring">};
+</span><span class="boring">use moirai_book_samples::events::mpmc::channel;
+</span><span class="boring">use std::time::Duration;
+</span><span class="boring">
+</span><span class="boring">fn main() {
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Sequential ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, sequential());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Fire and Forget ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, fire_and_forget());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Parent-Child ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, parent_child());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Wait for All ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, wait_for_all());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Wait for Any ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, wait_for_any());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Wait for Some ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, wait_for_some());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Supervisor ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, supervisor());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Actor ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, actor());
+</span><span class="boring">    });
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">fn example(f: impl FnOnce(&amp;Jobs) + 'static) {
+</span><span class="boring">    let jobs = Jobs::default();
+</span><span class="boring">    f(&amp;jobs);
+</span><span class="boring">    while !jobs.queue().is_empty() {
+</span><span class="boring">        jobs.run_local();
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn sequential() {
+</span><span class="boring">    // Run work sequentially.
+</span><span class="boring">    log("Step 1").await;
+</span><span class="boring">    log("Step 2").await;
+</span><span class="boring">    log("Step 3").await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn fire_and_forget() {
+</span><span class="boring">    log("Parent Start").await;
+</span><span class="boring">
+</span><span class="boring">    // Spawn a child job.
+</span><span class="boring">    spawn(JobLocation::Local, async {
+</span><span class="boring">        log("Child Start").await;
+</span><span class="boring">        log("Child End").await;
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    log("Parent End").await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn parent_child() {
+</span><span class="boring">    log("Parent Start").await;
+</span><span class="boring">
+</span><span class="boring">    // Spawn a child job.
+</span><span class="boring">    let child_job = spawn(JobLocation::Local, async {
+</span><span class="boring">        log("Child Start").await;
+</span><span class="boring">        log("Child End").await;
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    log("Parent Await").await;
+</span><span class="boring">
+</span><span class="boring">    // Await the child job to complete before exiting this coroutine.
+</span><span class="boring">    child_job.await;
+</span><span class="boring">
+</span><span class="boring">    log("Parent End").await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_all() {
+</span><span class="boring">    // Run multiple work in parallel and wait for all to complete.
+</span><span class="boring">    with_all(vec![
+</span><span class="boring">        Box::pin(log_delay("Work 1", 100)),
+</span><span class="boring">        Box::pin(log_delay("Work 2", 200)),
+</span><span class="boring">        Box::pin(log_delay("Work 3", 300)),
+</span><span class="boring">    ])
+</span><span class="boring">    .await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_any() {
+</span><span class="boring">    // Run multiple work in parallel and wait until quickest of them completes.
+</span><span class="boring">    with_any(vec![
+</span><span class="boring">        Box::pin(log_delay("Work 1", 100)),
+</span><span class="boring">        Box::pin(log_delay("Work 2", 200)),
+</span><span class="boring">        Box::pin(log_delay("Work 3", 300)),
+</span><span class="boring">    ])
+</span><span class="boring">    .await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_some() {
+</span>    // Run multiple work in parallel and wait until some of them complete, while
+    // ignoring other that didn't had time and were not required to complete.
+    with_importance(vec![
+        CompletionImportance::ignored(Box::pin(log_delay("Work 1", 100))),
+        CompletionImportance::required(Box::pin(log_delay("Work 2", 200))),
+        CompletionImportance::ignored(Box::pin(log_delay("Work 3", 300))),
+    ])
+    .await;
+<span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn supervisor() {
+</span><span class="boring">    // Spawn a supervisor job that controls retries.
+</span><span class="boring">    let job = spawn(JobLocation::Local, async {
+</span><span class="boring">        // Supervise certain job to automatically restart when it ends unexpectedly.
+</span><span class="boring">        loop {
+</span><span class="boring">            // Spawn a supervised child job.
+</span><span class="boring">            spawn(JobLocation::Local, async {
+</span><span class="boring">                println!("Supervised job started.");
+</span><span class="boring">
+</span><span class="boring">                // Emulate job that can end unexpectedly.
+</span><span class="boring">                wait_time(Duration::from_millis(rand::random_range(100..300))).await;
+</span><span class="boring">            })
+</span><span class="boring">            .await
+</span><span class="boring">            .await;
+</span><span class="boring">        }
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    // Kill supervisor after some time.
+</span><span class="boring">    wait_time(Duration::from_secs(1)).await;
+</span><span class="boring">    job.cancel();
+</span><span class="boring">    job.await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn actor() {
+</span><span class="boring">    // Define message type used for communication with spawned actor.
+</span><span class="boring">    enum Message {
+</span><span class="boring">        Tick,
+</span><span class="boring">        Terminate,
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    // Create communication channel.
+</span><span class="boring">    let (tx, rx) = channel::&lt;Message&gt;();
+</span><span class="boring">
+</span><span class="boring">    // Spawn actor job to run in the background.
+</span><span class="boring">    let child_job = spawn(JobLocation::Local, async move {
+</span><span class="boring">        let mut ticks = 0;
+</span><span class="boring">        loop {
+</span><span class="boring">            // Do some work based on messages received from outside world.
+</span><span class="boring">            let message = rx.receive().await;
+</span><span class="boring">            match message {
+</span><span class="boring">                Message::Tick =&gt; {
+</span><span class="boring">                    ticks += 1;
+</span><span class="boring">                    println!("Ticks: {}", ticks);
+</span><span class="boring">                }
+</span><span class="boring">                Message::Terminate =&gt; {
+</span><span class="boring">                    break;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">        }
+</span><span class="boring">        ticks
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    // Control actor via sending messages.
+</span><span class="boring">    tx.send(Message::Tick).await;
+</span><span class="boring">    wait(300).await;
+</span><span class="boring">
+</span><span class="boring">    tx.send(Message::Tick).await;
+</span><span class="boring">    wait(200).await;
+</span><span class="boring">
+</span><span class="boring">    tx.send(Message::Tick).await;
+</span><span class="boring">    wait(100).await;
+</span><span class="boring">
+</span><span class="boring">    tx.send(Message::Terminate).await;
+</span><span class="boring">    println!("Counted ticks: {}", child_job.await.unwrap());
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn log(message: &amp;str) {
+</span><span class="boring">    log_delay(message, 100).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn log_delay(message: &amp;str, milliseconds: u64) {
+</span><span class="boring">    wait(milliseconds).await;
+</span><span class="boring">    println!("{}", message);
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait(milliseconds: u64) {
+</span><span class="boring">    wait_time(Duration::from_millis(milliseconds)).await;
+</span><span class="boring">}</span></code></pre>
+<h2 id="supervisor"><a class="header" href="#supervisor">Supervisor</a></h2>
+<p>Spawning child jobs which lifetime are controlled by another job (supervisor). Usually used to restart jobs that failed their completion for some reason.</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">use moirai::{
+</span><span class="boring">    coroutine::{CompletionImportance, spawn, wait_time, with_all, with_any, with_importance},
+</span><span class="boring">    job::JobLocation,
+</span><span class="boring">    jobs::Jobs,
+</span><span class="boring">};
+</span><span class="boring">use moirai_book_samples::events::mpmc::channel;
+</span><span class="boring">use std::time::Duration;
+</span><span class="boring">
+</span><span class="boring">fn main() {
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Sequential ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, sequential());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Fire and Forget ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, fire_and_forget());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Parent-Child ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, parent_child());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Wait for All ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, wait_for_all());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Wait for Any ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, wait_for_any());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Wait for Some ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, wait_for_some());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Supervisor ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, supervisor());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Actor ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, actor());
+</span><span class="boring">    });
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">fn example(f: impl FnOnce(&amp;Jobs) + 'static) {
+</span><span class="boring">    let jobs = Jobs::default();
+</span><span class="boring">    f(&amp;jobs);
+</span><span class="boring">    while !jobs.queue().is_empty() {
+</span><span class="boring">        jobs.run_local();
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn sequential() {
+</span><span class="boring">    // Run work sequentially.
+</span><span class="boring">    log("Step 1").await;
+</span><span class="boring">    log("Step 2").await;
+</span><span class="boring">    log("Step 3").await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn fire_and_forget() {
+</span><span class="boring">    log("Parent Start").await;
+</span><span class="boring">
+</span><span class="boring">    // Spawn a child job.
+</span><span class="boring">    spawn(JobLocation::Local, async {
+</span><span class="boring">        log("Child Start").await;
+</span><span class="boring">        log("Child End").await;
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    log("Parent End").await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn parent_child() {
+</span><span class="boring">    log("Parent Start").await;
+</span><span class="boring">
+</span><span class="boring">    // Spawn a child job.
+</span><span class="boring">    let child_job = spawn(JobLocation::Local, async {
+</span><span class="boring">        log("Child Start").await;
+</span><span class="boring">        log("Child End").await;
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    log("Parent Await").await;
+</span><span class="boring">
+</span><span class="boring">    // Await the child job to complete before exiting this coroutine.
+</span><span class="boring">    child_job.await;
+</span><span class="boring">
+</span><span class="boring">    log("Parent End").await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_all() {
+</span><span class="boring">    // Run multiple work in parallel and wait for all to complete.
+</span><span class="boring">    with_all(vec![
+</span><span class="boring">        Box::pin(log_delay("Work 1", 100)),
+</span><span class="boring">        Box::pin(log_delay("Work 2", 200)),
+</span><span class="boring">        Box::pin(log_delay("Work 3", 300)),
+</span><span class="boring">    ])
+</span><span class="boring">    .await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_any() {
+</span><span class="boring">    // Run multiple work in parallel and wait until quickest of them completes.
+</span><span class="boring">    with_any(vec![
+</span><span class="boring">        Box::pin(log_delay("Work 1", 100)),
+</span><span class="boring">        Box::pin(log_delay("Work 2", 200)),
+</span><span class="boring">        Box::pin(log_delay("Work 3", 300)),
+</span><span class="boring">    ])
+</span><span class="boring">    .await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_some() {
+</span><span class="boring">    // Run multiple work in parallel and wait until some of them complete, while
+</span><span class="boring">    // ignoring other that didn't had time and were not required to complete.
+</span><span class="boring">    with_importance(vec![
+</span><span class="boring">        CompletionImportance::ignored(Box::pin(log_delay("Work 1", 100))),
+</span><span class="boring">        CompletionImportance::required(Box::pin(log_delay("Work 2", 200))),
+</span><span class="boring">        CompletionImportance::ignored(Box::pin(log_delay("Work 3", 300))),
+</span><span class="boring">    ])
+</span><span class="boring">    .await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn supervisor() {
+</span>    // Spawn a supervisor job that controls retries.
+    let job = spawn(JobLocation::Local, async {
+        // Supervise certain job to automatically restart when it ends unexpectedly.
+        loop {
+            // Spawn a supervised child job.
+            spawn(JobLocation::Local, async {
+                println!("Supervised job started.");
+
+                // Emulate job that can end unexpectedly.
+                wait_time(Duration::from_millis(rand::random_range(100..300))).await;
+            })
+            .await
+            .await;
+        }
+    })
+    .await;
+
+    // Kill supervisor after some time.
+    wait_time(Duration::from_secs(1)).await;
+    job.cancel();
+    job.await;
+<span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn actor() {
+</span><span class="boring">    // Define message type used for communication with spawned actor.
+</span><span class="boring">    enum Message {
+</span><span class="boring">        Tick,
+</span><span class="boring">        Terminate,
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    // Create communication channel.
+</span><span class="boring">    let (tx, rx) = channel::&lt;Message&gt;();
+</span><span class="boring">
+</span><span class="boring">    // Spawn actor job to run in the background.
+</span><span class="boring">    let child_job = spawn(JobLocation::Local, async move {
+</span><span class="boring">        let mut ticks = 0;
+</span><span class="boring">        loop {
+</span><span class="boring">            // Do some work based on messages received from outside world.
+</span><span class="boring">            let message = rx.receive().await;
+</span><span class="boring">            match message {
+</span><span class="boring">                Message::Tick =&gt; {
+</span><span class="boring">                    ticks += 1;
+</span><span class="boring">                    println!("Ticks: {}", ticks);
+</span><span class="boring">                }
+</span><span class="boring">                Message::Terminate =&gt; {
+</span><span class="boring">                    break;
+</span><span class="boring">                }
+</span><span class="boring">            }
+</span><span class="boring">        }
+</span><span class="boring">        ticks
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    // Control actor via sending messages.
+</span><span class="boring">    tx.send(Message::Tick).await;
+</span><span class="boring">    wait(300).await;
+</span><span class="boring">
+</span><span class="boring">    tx.send(Message::Tick).await;
+</span><span class="boring">    wait(200).await;
+</span><span class="boring">
+</span><span class="boring">    tx.send(Message::Tick).await;
+</span><span class="boring">    wait(100).await;
+</span><span class="boring">
+</span><span class="boring">    tx.send(Message::Terminate).await;
+</span><span class="boring">    println!("Counted ticks: {}", child_job.await.unwrap());
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn log(message: &amp;str) {
+</span><span class="boring">    log_delay(message, 100).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn log_delay(message: &amp;str, milliseconds: u64) {
+</span><span class="boring">    wait(milliseconds).await;
+</span><span class="boring">    println!("{}", message);
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait(milliseconds: u64) {
+</span><span class="boring">    wait_time(Duration::from_millis(milliseconds)).await;
+</span><span class="boring">}</span></code></pre>
+<h2 id="actor"><a class="header" href="#actor">Actor</a></h2>
+<p>Actors are jobs that do isolated work that communicates with outside world only via message passing.</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">use moirai::{
+</span><span class="boring">    coroutine::{CompletionImportance, spawn, wait_time, with_all, with_any, with_importance},
+</span><span class="boring">    job::JobLocation,
+</span><span class="boring">    jobs::Jobs,
+</span><span class="boring">};
+</span><span class="boring">use moirai_book_samples::events::mpmc::channel;
+</span><span class="boring">use std::time::Duration;
+</span><span class="boring">
+</span><span class="boring">fn main() {
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Sequential ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, sequential());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Fire and Forget ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, fire_and_forget());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Parent-Child ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, parent_child());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Wait for All ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, wait_for_all());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Wait for Any ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, wait_for_any());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Wait for Some ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, wait_for_some());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Supervisor ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, supervisor());
+</span><span class="boring">    });
+</span><span class="boring">    example(|jobs| {
+</span><span class="boring">        println!("--- Actor ---");
+</span><span class="boring">        jobs.spawn(JobLocation::Local, actor());
+</span><span class="boring">    });
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">fn example(f: impl FnOnce(&amp;Jobs) + 'static) {
+</span><span class="boring">    let jobs = Jobs::default();
+</span><span class="boring">    f(&amp;jobs);
+</span><span class="boring">    while !jobs.queue().is_empty() {
+</span><span class="boring">        jobs.run_local();
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn sequential() {
+</span><span class="boring">    // Run work sequentially.
+</span><span class="boring">    log("Step 1").await;
+</span><span class="boring">    log("Step 2").await;
+</span><span class="boring">    log("Step 3").await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn fire_and_forget() {
+</span><span class="boring">    log("Parent Start").await;
+</span><span class="boring">
+</span><span class="boring">    // Spawn a child job.
+</span><span class="boring">    spawn(JobLocation::Local, async {
+</span><span class="boring">        log("Child Start").await;
+</span><span class="boring">        log("Child End").await;
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    log("Parent End").await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn parent_child() {
+</span><span class="boring">    log("Parent Start").await;
+</span><span class="boring">
+</span><span class="boring">    // Spawn a child job.
+</span><span class="boring">    let child_job = spawn(JobLocation::Local, async {
+</span><span class="boring">        log("Child Start").await;
+</span><span class="boring">        log("Child End").await;
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    log("Parent Await").await;
+</span><span class="boring">
+</span><span class="boring">    // Await the child job to complete before exiting this coroutine.
+</span><span class="boring">    child_job.await;
+</span><span class="boring">
+</span><span class="boring">    log("Parent End").await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_all() {
+</span><span class="boring">    // Run multiple work in parallel and wait for all to complete.
+</span><span class="boring">    with_all(vec![
+</span><span class="boring">        Box::pin(log_delay("Work 1", 100)),
+</span><span class="boring">        Box::pin(log_delay("Work 2", 200)),
+</span><span class="boring">        Box::pin(log_delay("Work 3", 300)),
+</span><span class="boring">    ])
+</span><span class="boring">    .await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_any() {
+</span><span class="boring">    // Run multiple work in parallel and wait until quickest of them completes.
+</span><span class="boring">    with_any(vec![
+</span><span class="boring">        Box::pin(log_delay("Work 1", 100)),
+</span><span class="boring">        Box::pin(log_delay("Work 2", 200)),
+</span><span class="boring">        Box::pin(log_delay("Work 3", 300)),
+</span><span class="boring">    ])
+</span><span class="boring">    .await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_some() {
+</span><span class="boring">    // Run multiple work in parallel and wait until some of them complete, while
+</span><span class="boring">    // ignoring other that didn't had time and were not required to complete.
+</span><span class="boring">    with_importance(vec![
+</span><span class="boring">        CompletionImportance::ignored(Box::pin(log_delay("Work 1", 100))),
+</span><span class="boring">        CompletionImportance::required(Box::pin(log_delay("Work 2", 200))),
+</span><span class="boring">        CompletionImportance::ignored(Box::pin(log_delay("Work 3", 300))),
+</span><span class="boring">    ])
+</span><span class="boring">    .await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn supervisor() {
+</span><span class="boring">    // Spawn a supervisor job that controls retries.
+</span><span class="boring">    let job = spawn(JobLocation::Local, async {
+</span><span class="boring">        // Supervise certain job to automatically restart when it ends unexpectedly.
+</span><span class="boring">        loop {
+</span><span class="boring">            // Spawn a supervised child job.
+</span><span class="boring">            spawn(JobLocation::Local, async {
+</span><span class="boring">                println!("Supervised job started.");
+</span><span class="boring">
+</span><span class="boring">                // Emulate job that can end unexpectedly.
+</span><span class="boring">                wait_time(Duration::from_millis(rand::random_range(100..300))).await;
+</span><span class="boring">            })
+</span><span class="boring">            .await
+</span><span class="boring">            .await;
+</span><span class="boring">        }
+</span><span class="boring">    })
+</span><span class="boring">    .await;
+</span><span class="boring">
+</span><span class="boring">    // Kill supervisor after some time.
+</span><span class="boring">    wait_time(Duration::from_secs(1)).await;
+</span><span class="boring">    job.cancel();
+</span><span class="boring">    job.await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn actor() {
+</span>    // Define message type used for communication with spawned actor.
+    enum Message {
+        Tick,
+        Terminate,
+    }
+
+    // Create communication channel.
+    let (tx, rx) = channel::&lt;Message&gt;();
+
+    // Spawn actor job to run in the background.
+    let child_job = spawn(JobLocation::Local, async move {
+        let mut ticks = 0;
+        loop {
+            // Do some work based on messages received from outside world.
+            let message = rx.receive().await;
+            match message {
+                Message::Tick =&gt; {
+                    ticks += 1;
+                    println!("Ticks: {}", ticks);
+                }
+                Message::Terminate =&gt; {
+                    break;
+                }
+            }
+        }
+        ticks
+    })
+    .await;
+
+    // Control actor via sending messages.
+    tx.send(Message::Tick).await;
+    wait(300).await;
+
+    tx.send(Message::Tick).await;
+    wait(200).await;
+
+    tx.send(Message::Tick).await;
+    wait(100).await;
+
+    tx.send(Message::Terminate).await;
+    println!("Counted ticks: {}", child_job.await.unwrap());
+<span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn log(message: &amp;str) {
+</span><span class="boring">    log_delay(message, 100).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn log_delay(message: &amp;str, milliseconds: u64) {
+</span><span class="boring">    wait(milliseconds).await;
+</span><span class="boring">    println!("{}", message);
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait(milliseconds: u64) {
+</span><span class="boring">    wait_time(Duration::from_millis(milliseconds)).await;
+</span><span class="boring">}</span></code></pre>
 
                     </main>
 
