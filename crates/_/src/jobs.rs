@@ -647,8 +647,8 @@ impl Default for Jobs {
 }
 
 impl Jobs {
-    pub fn empty(iteration_timeout: Duration) -> Jobs {
-        Jobs::new(0, iteration_timeout)
+    pub fn local_only() -> Jobs {
+        Jobs::new(0, Duration::ZERO)
     }
 
     pub fn new(unnamed_workers_count: usize, iteration_timeout: Duration) -> Jobs {

@@ -19,8 +19,8 @@
 - [Real-world usage](./usage/self.md)
   - [Engine integration](./usage/integration/self.md)
     - [General game loop model](./usage/integration/loop-model.md)
-    <!-- - [Macroquad example](./integration/macroquad.md) -->
-    <!-- - [Bevy example](./integration/bevy.md) -->
+    - [Macroquad example](./usage/integration/macroquad.md)
+    - [Bevy example](./usage/integration/bevy.md)
 - [Advanced topics](./advanced/self.md)
   - [Async under-the-hood from gamedev POV](./advanced/underthehood)
   - [Debugging and timeline tracing](./advanced/debugging.md)
