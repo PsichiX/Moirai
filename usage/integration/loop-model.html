@@ -35,10 +35,10 @@
             const path_to_root = "../../";
             const default_light_theme = "ayu";
             const default_dark_theme = "ayu";
-            window.path_to_searchindex_js = "../../searchindex-2878d52a.js";
+            window.path_to_searchindex_js = "../../searchindex-2ccaaca1.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../../toc-35ad9a92.js"></script>
+        <script src="../../toc-aa509158.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -175,9 +175,29 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="general-game-loop-model"><a class="header" href="#general-game-loop-model">General game loop model</a></h1>
-<blockquote>
-<p>TODO</p>
-</blockquote>
+<p>Moirai, when using it’s ready-to-go <code>Jobs</code> engine, it’s super easy to plug into your game, as all what you do is you create <code>Jobs</code> engine and store it in your game/engine resources.</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">use moirai::jobs::Jobs;
+</span><span class="boring">
+</span>fn main() {
+    // Setup Moirai engine with default jobs system.
+    let engine = Engine {
+        jobs: Jobs::default(),
+    };
+
+    // Game frame loop.
+    loop {
+        // Typical game update logic would go here...
+
+        // Do single Moirai local jobs run to make progress on coroutines at the
+        // end of the frame. Single run suspends at any `.await` point.
+        engine.jobs.run_local();
+    }
+}
+
+struct Engine {
+    jobs: Jobs,
+}</code></pre>
+<p>Default <code>Jobs</code> engine creates worker-threads for each CPU core. If you need only local jobs, like many games do for coroutines, you can always use <code>Jobs::local_only()</code>.</p>
 
                     </main>
 
@@ -187,7 +207,7 @@
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="../../advanced/self.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                            <a rel="next prefetch" href="../../usage/integration/macroquad.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                             </a>
 
@@ -201,7 +221,7 @@
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="../../advanced/self.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                    <a rel="next prefetch" href="../../usage/integration/macroquad.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
                     </a>
             </nav>

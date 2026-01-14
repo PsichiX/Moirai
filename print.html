@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "ayu";
             const default_dark_theme = "ayu";
-            window.path_to_searchindex_js = "searchindex-2878d52a.js";
+            window.path_to_searchindex_js = "searchindex-2ccaaca1.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-35ad9a92.js"></script>
+        <script src="toc-aa509158.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -12248,16 +12248,461 @@ before_physics_queue.spawn(async move {
 </span><span class="boring">}</span></code></pre>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="real-world-usage"><a class="header" href="#real-world-usage">Real-world usage</a></h1>
-<blockquote>
-<p>TODO</p>
-</blockquote>
+<p>Once we’ve got an intuition and core skills of working with coroutines, it’s time to show how to fit coroutines into your game, using Moirai as an async runtime.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="engine-integration"><a class="header" href="#engine-integration">Engine integration</a></h1>
-<blockquote>
-<p>TODO</p>
-</blockquote>
+<p>In this chapter we will dive into integrating Moirai into your own game, using more generic approach as well as suited for some popular game engines/frameworks.</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="general-game-loop-model"><a class="header" href="#general-game-loop-model">General game loop model</a></h1>
+<p>Moirai, when using it’s ready-to-go <code>Jobs</code> engine, it’s super easy to plug into your game, as all what you do is you create <code>Jobs</code> engine and store it in your game/engine resources.</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">use moirai::jobs::Jobs;
+</span><span class="boring">
+</span>fn main() {
+    // Setup Moirai engine with default jobs system.
+    let engine = Engine {
+        jobs: Jobs::default(),
+    };
+
+    // Game frame loop.
+    loop {
+        // Typical game update logic would go here...
+
+        // Do single Moirai local jobs run to make progress on coroutines at the
+        // end of the frame. Single run suspends at any `.await` point.
+        engine.jobs.run_local();
+    }
+}
+
+struct Engine {
+    jobs: Jobs,
+}</code></pre>
+<p>Default <code>Jobs</code> engine creates worker-threads for each CPU core. If you need only local jobs, like many games do for coroutines, you can always use <code>Jobs::local_only()</code>.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="macroquad-example"><a class="header" href="#macroquad-example">Macroquad example</a></h1>
+<p>Macroquad is the simplest game framework to integrate into, as all you have to do is to create <code>Jobs</code> engine, and then you can spawn coroutines (as local jobs) from anywhere in game code.</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">use futures::join;
+</span><span class="boring">use macroquad::prelude::{
+</span><span class="boring">    coroutines::wait_seconds,
+</span><span class="boring">    scene::{Handle, Node, RefMut, add_node, get_node, set_camera},
+</span><span class="boring">    *,
+</span><span class="boring">};
+</span><span class="boring">use moirai::{coroutine::spawn, job::JobLocation, jobs::Jobs};
+</span><span class="boring">
+</span><span class="boring">const ZOOMOUT: f32 = 200.0;
+</span><span class="boring">
+</span>#[macroquad::main("Game")]
+async fn main() {
+    // Setup local-only jobs system, as we shouldn't use multithreading for
+    // macroquad.
+    let jobs = Jobs::local_only();
+
+    // Create player and enemy characters as nodes in scene graph.
+    let player = add_node(GameObject {
+        position: vec2(-150.0, 0.0),
+        shape: Shape::Circle { radius: 15.0 },
+        color: BLUE,
+        dialogue: None,
+    });
+    let enemy = add_node(GameObject {
+        position: vec2(100.0, 0.0),
+        shape: Shape::Square { size: 30.0 },
+        color: RED,
+        dialogue: None,
+    });
+
+    // Spawn cutscene coroutine to be played with Moirai.
+    jobs.spawn(JobLocation::Local, cutscene(player, enemy));
+
+    // Main game loop.
+    loop {
+        // Run local jobs to make progress on coroutines.
+        jobs.run_local();
+
+        clear_background(LIGHTGRAY);
+        let camera = Camera2D {
+            zoom: vec2(
+                1.0 / ZOOMOUT * screen_height() / screen_width(),
+                1.0 / ZOOMOUT,
+            ),
+            target: vec2(0.0, 0.0),
+            ..Default::default()
+        };
+        set_camera(0, Some(camera));
+        next_frame().await
+    }
+}
+<span class="boring">
+</span><span class="boring">async fn cutscene(player: Handle&lt;GameObject&gt;, enemy: Handle&lt;GameObject&gt;) {
+</span><span class="boring">    move_character(player, vec2(-100.0, 0.0), 50.0).await;
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(enemy, "You dare challenge me, mortal?", 2.0).await;
+</span><span class="boring">
+</span><span class="boring">    move_character(player, vec2(-15.0, 0.0), 100.0).await;
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(player, "I will defeat you!", 2.0).await;
+</span><span class="boring">
+</span><span class="boring">    move_character(enemy, vec2(15.0, 0.0), 80.0).await;
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(enemy, "Prepare to meet your maker!", 2.0).await;
+</span><span class="boring">
+</span><span class="boring">    wait_for_battle_start().await;
+</span><span class="boring">
+</span><span class="boring">    join!(
+</span><span class="boring">        spawn(
+</span><span class="boring">            JobLocation::Local,
+</span><span class="boring">            move_character(player, vec2(-50.0, 0.0), 150.0),
+</span><span class="boring">        ),
+</span><span class="boring">        spawn(
+</span><span class="boring">            JobLocation::Local,
+</span><span class="boring">            move_character(enemy, vec2(50.0, 0.0), 150.0),
+</span><span class="boring">        )
+</span><span class="boring">    );
+</span><span class="boring">
+</span><span class="boring">    join!(
+</span><span class="boring">        move_character(player, vec2(0.0, 0.0), 200.0),
+</span><span class="boring">        move_character(enemy, vec2(0.0, 0.0), 200.0)
+</span><span class="boring">    );
+</span><span class="boring">
+</span><span class="boring">    join!(
+</span><span class="boring">        move_character(player, vec2(-150.0, 0.0), 200.0),
+</span><span class="boring">        move_character(enemy, vec2(-15.0, 0.0), 50.0),
+</span><span class="boring">    );
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(player, "Argh! Such pain!", 2.0).await;
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(enemy, "Victory is mine!", 2.0).await;
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(player, "You've won!", 1.0).await;
+</span><span class="boring">    timed_dialogue(player, "I surrender...!", 1.0).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn show_dialogue(character: Handle&lt;GameObject&gt;, text: impl ToString) {
+</span><span class="boring">    get_node(character).dialogue = Some(text.to_string());
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn hide_dialogue(character: Handle&lt;GameObject&gt;) {
+</span><span class="boring">    get_node(character).dialogue = None;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn timed_dialogue(character: Handle&lt;GameObject&gt;, text: impl ToString, duration: f32) {
+</span><span class="boring">    show_dialogue(character, text).await;
+</span><span class="boring">    wait_seconds(duration).await;
+</span><span class="boring">    hide_dialogue(character).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn move_character(character: Handle&lt;GameObject&gt;, target: Vec2, speed: f32) {
+</span><span class="boring">    loop {
+</span><span class="boring">        {
+</span><span class="boring">            let mut node = get_node(character);
+</span><span class="boring">            let direction = (target - node.position).normalize_or_zero();
+</span><span class="boring">            let distance = node.position.distance(target);
+</span><span class="boring">
+</span><span class="boring">            let dt = get_frame_time();
+</span><span class="boring">            let speed = speed * dt;
+</span><span class="boring">            if distance &lt; speed {
+</span><span class="boring">                node.position = target;
+</span><span class="boring">                break;
+</span><span class="boring">            } else {
+</span><span class="boring">                node.position += direction * speed;
+</span><span class="boring">            }
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        next_frame().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_battle_start() {
+</span><span class="boring">    let dialogue = add_node(Dialogue {
+</span><span class="boring">        text: "Press SPACE to start the battle!".to_string(),
+</span><span class="boring">    });
+</span><span class="boring">
+</span><span class="boring">    loop {
+</span><span class="boring">        if is_key_pressed(KeyCode::Space) {
+</span><span class="boring">            break;
+</span><span class="boring">        }
+</span><span class="boring">        next_frame().await;
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    get_node(dialogue).delete();
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">struct GameObject {
+</span><span class="boring">    position: Vec2,
+</span><span class="boring">    shape: Shape,
+</span><span class="boring">    color: Color,
+</span><span class="boring">    dialogue: Option&lt;String&gt;,
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl Node for GameObject {
+</span><span class="boring">    fn draw(node: RefMut&lt;Self&gt;)
+</span><span class="boring">    where
+</span><span class="boring">        Self: Sized,
+</span><span class="boring">    {
+</span><span class="boring">        match node.shape {
+</span><span class="boring">            Shape::Circle { radius } =&gt; {
+</span><span class="boring">                draw_circle(node.position.x, node.position.y, radius, node.color);
+</span><span class="boring">            }
+</span><span class="boring">            Shape::Square { size } =&gt; {
+</span><span class="boring">                draw_rectangle(
+</span><span class="boring">                    node.position.x - size / 2.0,
+</span><span class="boring">                    node.position.y - size / 2.0,
+</span><span class="boring">                    size,
+</span><span class="boring">                    size,
+</span><span class="boring">                    node.color,
+</span><span class="boring">                );
+</span><span class="boring">            }
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        if let Some(dialogue) = node.dialogue.as_ref() {
+</span><span class="boring">            let text_dimensions = measure_text(dialogue, None, 20, 1.0);
+</span><span class="boring">            draw_text(
+</span><span class="boring">                dialogue,
+</span><span class="boring">                node.position.x - text_dimensions.width / 2.0,
+</span><span class="boring">                node.position.y - 40.0,
+</span><span class="boring">                20.0,
+</span><span class="boring">                BLACK,
+</span><span class="boring">            );
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">enum Shape {
+</span><span class="boring">    Circle { radius: f32 },
+</span><span class="boring">    Square { size: f32 },
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">struct Dialogue {
+</span><span class="boring">    text: String,
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl Node for Dialogue {
+</span><span class="boring">    fn draw(node: RefMut&lt;Self&gt;)
+</span><span class="boring">    where
+</span><span class="boring">        Self: Sized,
+</span><span class="boring">    {
+</span><span class="boring">        let text_dimensions = measure_text(&amp;node.text, None, 20, 1.0);
+</span><span class="boring">        draw_text(
+</span><span class="boring">            &amp;node.text,
+</span><span class="boring">            -text_dimensions.width / 2.0,
+</span><span class="boring">            ZOOMOUT / 2.0 - text_dimensions.height - 20.0,
+</span><span class="boring">            20.0,
+</span><span class="boring">            BLACK,
+</span><span class="boring">        );
+</span><span class="boring">    }
+</span><span class="boring">}</span></code></pre>
+<p>Also, due to singleton-like nature of Macroquad, when using its scene graph, you can easily access manipulated game objects from anywhere inside Moirai coroutines!</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">use futures::join;
+</span><span class="boring">use macroquad::prelude::{
+</span><span class="boring">    coroutines::wait_seconds,
+</span><span class="boring">    scene::{Handle, Node, RefMut, add_node, get_node, set_camera},
+</span><span class="boring">    *,
+</span><span class="boring">};
+</span><span class="boring">use moirai::{coroutine::spawn, job::JobLocation, jobs::Jobs};
+</span><span class="boring">
+</span><span class="boring">const ZOOMOUT: f32 = 200.0;
+</span><span class="boring">
+</span><span class="boring">#[macroquad::main("Game")]
+</span><span class="boring">async fn main() {
+</span><span class="boring">    // Setup local-only jobs system, as we shouldn't use multithreading for
+</span><span class="boring">    // macroquad.
+</span><span class="boring">    let jobs = Jobs::local_only();
+</span><span class="boring">
+</span><span class="boring">    // Create player and enemy characters as nodes in scene graph.
+</span><span class="boring">    let player = add_node(GameObject {
+</span><span class="boring">        position: vec2(-150.0, 0.0),
+</span><span class="boring">        shape: Shape::Circle { radius: 15.0 },
+</span><span class="boring">        color: BLUE,
+</span><span class="boring">        dialogue: None,
+</span><span class="boring">    });
+</span><span class="boring">    let enemy = add_node(GameObject {
+</span><span class="boring">        position: vec2(100.0, 0.0),
+</span><span class="boring">        shape: Shape::Square { size: 30.0 },
+</span><span class="boring">        color: RED,
+</span><span class="boring">        dialogue: None,
+</span><span class="boring">    });
+</span><span class="boring">
+</span><span class="boring">    // Spawn cutscene coroutine to be played with Moirai.
+</span><span class="boring">    jobs.spawn(JobLocation::Local, cutscene(player, enemy));
+</span><span class="boring">
+</span><span class="boring">    // Main game loop.
+</span><span class="boring">    loop {
+</span><span class="boring">        // Run local jobs to make progress on coroutines.
+</span><span class="boring">        jobs.run_local();
+</span><span class="boring">
+</span><span class="boring">        clear_background(LIGHTGRAY);
+</span><span class="boring">        let camera = Camera2D {
+</span><span class="boring">            zoom: vec2(
+</span><span class="boring">                1.0 / ZOOMOUT * screen_height() / screen_width(),
+</span><span class="boring">                1.0 / ZOOMOUT,
+</span><span class="boring">            ),
+</span><span class="boring">            target: vec2(0.0, 0.0),
+</span><span class="boring">            ..Default::default()
+</span><span class="boring">        };
+</span><span class="boring">        set_camera(0, Some(camera));
+</span><span class="boring">        next_frame().await
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn cutscene(player: Handle&lt;GameObject&gt;, enemy: Handle&lt;GameObject&gt;) {
+</span><span class="boring">    move_character(player, vec2(-100.0, 0.0), 50.0).await;
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(enemy, "You dare challenge me, mortal?", 2.0).await;
+</span><span class="boring">
+</span><span class="boring">    move_character(player, vec2(-15.0, 0.0), 100.0).await;
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(player, "I will defeat you!", 2.0).await;
+</span><span class="boring">
+</span><span class="boring">    move_character(enemy, vec2(15.0, 0.0), 80.0).await;
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(enemy, "Prepare to meet your maker!", 2.0).await;
+</span><span class="boring">
+</span><span class="boring">    wait_for_battle_start().await;
+</span><span class="boring">
+</span><span class="boring">    join!(
+</span><span class="boring">        spawn(
+</span><span class="boring">            JobLocation::Local,
+</span><span class="boring">            move_character(player, vec2(-50.0, 0.0), 150.0),
+</span><span class="boring">        ),
+</span><span class="boring">        spawn(
+</span><span class="boring">            JobLocation::Local,
+</span><span class="boring">            move_character(enemy, vec2(50.0, 0.0), 150.0),
+</span><span class="boring">        )
+</span><span class="boring">    );
+</span><span class="boring">
+</span><span class="boring">    join!(
+</span><span class="boring">        move_character(player, vec2(0.0, 0.0), 200.0),
+</span><span class="boring">        move_character(enemy, vec2(0.0, 0.0), 200.0)
+</span><span class="boring">    );
+</span><span class="boring">
+</span><span class="boring">    join!(
+</span><span class="boring">        move_character(player, vec2(-150.0, 0.0), 200.0),
+</span><span class="boring">        move_character(enemy, vec2(-15.0, 0.0), 50.0),
+</span><span class="boring">    );
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(player, "Argh! Such pain!", 2.0).await;
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(enemy, "Victory is mine!", 2.0).await;
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(player, "You've won!", 1.0).await;
+</span><span class="boring">    timed_dialogue(player, "I surrender...!", 1.0).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span>async fn show_dialogue(character: Handle&lt;GameObject&gt;, text: impl ToString) {
+    get_node(character).dialogue = Some(text.to_string());
+}
+<span class="boring">
+</span><span class="boring">async fn hide_dialogue(character: Handle&lt;GameObject&gt;) {
+</span><span class="boring">    get_node(character).dialogue = None;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn timed_dialogue(character: Handle&lt;GameObject&gt;, text: impl ToString, duration: f32) {
+</span><span class="boring">    show_dialogue(character, text).await;
+</span><span class="boring">    wait_seconds(duration).await;
+</span><span class="boring">    hide_dialogue(character).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn move_character(character: Handle&lt;GameObject&gt;, target: Vec2, speed: f32) {
+</span><span class="boring">    loop {
+</span><span class="boring">        {
+</span><span class="boring">            let mut node = get_node(character);
+</span><span class="boring">            let direction = (target - node.position).normalize_or_zero();
+</span><span class="boring">            let distance = node.position.distance(target);
+</span><span class="boring">
+</span><span class="boring">            let dt = get_frame_time();
+</span><span class="boring">            let speed = speed * dt;
+</span><span class="boring">            if distance &lt; speed {
+</span><span class="boring">                node.position = target;
+</span><span class="boring">                break;
+</span><span class="boring">            } else {
+</span><span class="boring">                node.position += direction * speed;
+</span><span class="boring">            }
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        next_frame().await;
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn wait_for_battle_start() {
+</span><span class="boring">    let dialogue = add_node(Dialogue {
+</span><span class="boring">        text: "Press SPACE to start the battle!".to_string(),
+</span><span class="boring">    });
+</span><span class="boring">
+</span><span class="boring">    loop {
+</span><span class="boring">        if is_key_pressed(KeyCode::Space) {
+</span><span class="boring">            break;
+</span><span class="boring">        }
+</span><span class="boring">        next_frame().await;
+</span><span class="boring">    }
+</span><span class="boring">
+</span><span class="boring">    get_node(dialogue).delete();
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">struct GameObject {
+</span><span class="boring">    position: Vec2,
+</span><span class="boring">    shape: Shape,
+</span><span class="boring">    color: Color,
+</span><span class="boring">    dialogue: Option&lt;String&gt;,
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl Node for GameObject {
+</span><span class="boring">    fn draw(node: RefMut&lt;Self&gt;)
+</span><span class="boring">    where
+</span><span class="boring">        Self: Sized,
+</span><span class="boring">    {
+</span><span class="boring">        match node.shape {
+</span><span class="boring">            Shape::Circle { radius } =&gt; {
+</span><span class="boring">                draw_circle(node.position.x, node.position.y, radius, node.color);
+</span><span class="boring">            }
+</span><span class="boring">            Shape::Square { size } =&gt; {
+</span><span class="boring">                draw_rectangle(
+</span><span class="boring">                    node.position.x - size / 2.0,
+</span><span class="boring">                    node.position.y - size / 2.0,
+</span><span class="boring">                    size,
+</span><span class="boring">                    size,
+</span><span class="boring">                    node.color,
+</span><span class="boring">                );
+</span><span class="boring">            }
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        if let Some(dialogue) = node.dialogue.as_ref() {
+</span><span class="boring">            let text_dimensions = measure_text(dialogue, None, 20, 1.0);
+</span><span class="boring">            draw_text(
+</span><span class="boring">                dialogue,
+</span><span class="boring">                node.position.x - text_dimensions.width / 2.0,
+</span><span class="boring">                node.position.y - 40.0,
+</span><span class="boring">                20.0,
+</span><span class="boring">                BLACK,
+</span><span class="boring">            );
+</span><span class="boring">        }
+</span><span class="boring">    }
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">enum Shape {
+</span><span class="boring">    Circle { radius: f32 },
+</span><span class="boring">    Square { size: f32 },
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">struct Dialogue {
+</span><span class="boring">    text: String,
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">impl Node for Dialogue {
+</span><span class="boring">    fn draw(node: RefMut&lt;Self&gt;)
+</span><span class="boring">    where
+</span><span class="boring">        Self: Sized,
+</span><span class="boring">    {
+</span><span class="boring">        let text_dimensions = measure_text(&amp;node.text, None, 20, 1.0);
+</span><span class="boring">        draw_text(
+</span><span class="boring">            &amp;node.text,
+</span><span class="boring">            -text_dimensions.width / 2.0,
+</span><span class="boring">            ZOOMOUT / 2.0 - text_dimensions.height - 20.0,
+</span><span class="boring">            20.0,
+</span><span class="boring">            BLACK,
+</span><span class="boring">        );
+</span><span class="boring">    }
+</span><span class="boring">}</span></code></pre>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="bevy-example"><a class="header" href="#bevy-example">Bevy example</a></h1>
 <blockquote>
 <p>TODO</p>
 </blockquote>
