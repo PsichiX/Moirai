@@ -7,9 +7,11 @@ publish = false
 
 [dependencies]
 moirai = { version = "0.8", path = "../../crates/_" }
+moirai-bevy = { version = "0.8", path = "../../crates/bevy" }
 crossterm = "0.29"
 vek = "0.17"
 textwrap = "0.16"
 rand = "0.9"
-macroquad = "0.4"
 futures = "0.3"
+macroquad = "0.4"
+bevy = { version = "0.18", default-features = false, features = ["2d"] }

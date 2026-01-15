@@ -1,0 +1,15 @@
+[package]
+name = "moirai-bevy"
+version = "0.8.0"
+edition = "2024"
+authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
+description = "Moirai plugin for Bevy game engine"
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/PsichiX/moirai"
+repository = "https://github.com/PsichiX/moirai"
+documentation = "https://docs.rs/moirai-bevy"
+readme = "../../README.md"
+
+[dependencies]
+moirai = { version = "0.8", path = "../_" }
+bevy = { version = "0.18", default-features = false }
