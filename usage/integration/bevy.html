@@ -35,7 +35,7 @@
             const path_to_root = "../../";
             const default_light_theme = "ayu";
             const default_dark_theme = "ayu";
-            window.path_to_searchindex_js = "../../searchindex-2ccaaca1.js";
+            window.path_to_searchindex_js = "../../searchindex-01ec63b2.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../../toc-aa509158.js"></script>
@@ -175,9 +175,694 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="bevy-example"><a class="header" href="#bevy-example">Bevy example</a></h1>
-<blockquote>
-<p>TODO</p>
-</blockquote>
+<p>Bevy has it’s own dedicated Moirai plugin, that handles all required integration.</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">use bevy::{camera::ScalingMode, prelude::*};
+</span><span class="boring">use futures::join;
+</span><span class="boring">use moirai::{coroutine::spawn, job::JobLocation};
+</span><span class="boring">use moirai_bevy::{
+</span><span class="boring">    Coroutines, MoiraiPlugin,
+</span><span class="boring">    coroutine::{next_frame, wait_secs, world},
+</span><span class="boring">};
+</span><span class="boring">
+</span>fn main() {
+    let mut app = App::new();
+    app.add_plugins((DefaultPlugins, MoiraiPlugin))
+        .add_systems(Startup, setup);
+    app.run();
+}
+<span class="boring">
+</span><span class="boring">fn setup(
+</span><span class="boring">    mut commands: Commands,
+</span><span class="boring">    asset_server: Res&lt;AssetServer&gt;,
+</span><span class="boring">    mut meshes: ResMut&lt;Assets&lt;Mesh&gt;&gt;,
+</span><span class="boring">    mut materials: ResMut&lt;Assets&lt;ColorMaterial&gt;&gt;,
+</span><span class="boring">    coroutines: Res&lt;Coroutines&gt;,
+</span><span class="boring">) {
+</span><span class="boring">    let font = asset_server.load("noto.ttf");
+</span><span class="boring">
+</span><span class="boring">    commands.spawn((
+</span><span class="boring">        Camera2d,
+</span><span class="boring">        Projection::Orthographic(OrthographicProjection {
+</span><span class="boring">            scaling_mode: ScalingMode::FixedVertical {
+</span><span class="boring">                viewport_height: 500.0,
+</span><span class="boring">            },
+</span><span class="boring">            ..OrthographicProjection::default_2d()
+</span><span class="boring">        }),
+</span><span class="boring">    ));
+</span><span class="boring">
+</span><span class="boring">    let player_dialogue = commands
+</span><span class="boring">        .spawn((
+</span><span class="boring">            Text2d::default(),
+</span><span class="boring">            TextFont {
+</span><span class="boring">                font: font.clone(),
+</span><span class="boring">                font_size: 20.0,
+</span><span class="boring">                ..Default::default()
+</span><span class="boring">            },
+</span><span class="boring">            TextLayout::new_with_justify(Justify::Center).with_no_wrap(),
+</span><span class="boring">            TextColor::WHITE,
+</span><span class="boring">            Transform::from_xyz(0.0, 50.0, 0.0),
+</span><span class="boring">        ))
+</span><span class="boring">        .id();
+</span><span class="boring">
+</span><span class="boring">    let player = commands
+</span><span class="boring">        .spawn((
+</span><span class="boring">            Mesh2d(meshes.add(Circle::new(15.0))),
+</span><span class="boring">            MeshMaterial2d(materials.add(Color::linear_rgb(0.0, 0.47, 0.95))),
+</span><span class="boring">            Transform::from_xyz(-150.0, 0.0, 0.0),
+</span><span class="boring">        ))
+</span><span class="boring">        .add_child(player_dialogue)
+</span><span class="boring">        .id();
+</span><span class="boring">
+</span><span class="boring">    let enemy_dialogue = commands
+</span><span class="boring">        .spawn((
+</span><span class="boring">            Text2d::default(),
+</span><span class="boring">            TextFont {
+</span><span class="boring">                font: font.clone(),
+</span><span class="boring">                font_size: 20.0,
+</span><span class="boring">                ..Default::default()
+</span><span class="boring">            },
+</span><span class="boring">            TextLayout::new_with_justify(Justify::Center).with_no_wrap(),
+</span><span class="boring">            TextColor::WHITE,
+</span><span class="boring">            Transform::from_xyz(0.0, 50.0, 0.0),
+</span><span class="boring">        ))
+</span><span class="boring">        .id();
+</span><span class="boring">
+</span><span class="boring">    let enemy = commands
+</span><span class="boring">        .spawn((
+</span><span class="boring">            Mesh2d(meshes.add(Rectangle::new(30.0, 30.0))),
+</span><span class="boring">            MeshMaterial2d(materials.add(Color::linear_rgb(0.95, 0.16, 0.22))),
+</span><span class="boring">            Transform::from_xyz(100.0, 0.0, 0.0),
+</span><span class="boring">        ))
+</span><span class="boring">        .add_child(enemy_dialogue)
+</span><span class="boring">        .id();
+</span><span class="boring">
+</span><span class="boring">    coroutines.jobs.spawn(
+</span><span class="boring">        JobLocation::Local,
+</span><span class="boring">        cutscene(player, player_dialogue, enemy, enemy_dialogue),
+</span><span class="boring">    );
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn cutscene(player: Entity, player_dialogue: Entity, enemy: Entity, enemy_dialogue: Entity) {
+</span><span class="boring">    move_character(player, vec2(-100.0, 0.0), 50.0).await;
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(enemy_dialogue, "You dare challenge me, mortal?", 2.0).await;
+</span><span class="boring">
+</span><span class="boring">    move_character(player, vec2(-15.0, 0.0), 100.0).await;
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(player_dialogue, "I will defeat you!", 2.0).await;
+</span><span class="boring">
+</span><span class="boring">    move_character(enemy, vec2(15.0, 0.0), 80.0).await;
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(enemy_dialogue, "Prepare to meet your maker!", 2.0).await;
+</span><span class="boring">
+</span><span class="boring">    join!(
+</span><span class="boring">        spawn(
+</span><span class="boring">            JobLocation::Local,
+</span><span class="boring">            move_character(player, vec2(-50.0, 0.0), 150.0),
+</span><span class="boring">        ),
+</span><span class="boring">        spawn(
+</span><span class="boring">            JobLocation::Local,
+</span><span class="boring">            move_character(enemy, vec2(50.0, 0.0), 150.0),
+</span><span class="boring">        )
+</span><span class="boring">    );
+</span><span class="boring">
+</span><span class="boring">    join!(
+</span><span class="boring">        move_character(player, vec2(0.0, 0.0), 200.0),
+</span><span class="boring">        move_character(enemy, vec2(0.0, 0.0), 200.0)
+</span><span class="boring">    );
+</span><span class="boring">
+</span><span class="boring">    join!(
+</span><span class="boring">        move_character(player, vec2(-150.0, 0.0), 200.0),
+</span><span class="boring">        move_character(enemy, vec2(-15.0, 0.0), 50.0),
+</span><span class="boring">    );
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(player_dialogue, "Argh! Such pain!", 2.0).await;
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(enemy_dialogue, "Victory is mine!", 2.0).await;
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(player_dialogue, "You've won!", 1.0).await;
+</span><span class="boring">    timed_dialogue(player_dialogue, "I surrender...!", 1.0).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn show_dialogue(dialogue: Entity, content: impl ToString) {
+</span><span class="boring">    let world = world().await;
+</span><span class="boring">    let world = &amp;mut *world.write().unwrap();
+</span><span class="boring">    let mut text = world.get_mut::&lt;Text2d&gt;(dialogue).unwrap();
+</span><span class="boring">    text.0 = content.to_string();
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn hide_dialogue(dialogue: Entity) {
+</span><span class="boring">    let world = world().await;
+</span><span class="boring">    let world = &amp;mut *world.write().unwrap();
+</span><span class="boring">    let mut text = world.get_mut::&lt;Text2d&gt;(dialogue).unwrap();
+</span><span class="boring">    text.0.clear();
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn timed_dialogue(dialogue: Entity, text: impl ToString, duration: f32) {
+</span><span class="boring">    show_dialogue(dialogue, text).await;
+</span><span class="boring">    wait_secs(duration).await;
+</span><span class="boring">    hide_dialogue(dialogue).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn move_character(character: Entity, target: Vec2, speed: f32) {
+</span><span class="boring">    loop {
+</span><span class="boring">        {
+</span><span class="boring">            let world = world().await;
+</span><span class="boring">            let world = &amp;mut *world.write().unwrap();
+</span><span class="boring">            let dt = world.resource::&lt;Time&gt;().delta_secs();
+</span><span class="boring">
+</span><span class="boring">            let mut transform = world.get_mut::&lt;Transform&gt;(character).unwrap();
+</span><span class="boring">            let direction = (target - transform.translation.truncate()).normalize_or_zero();
+</span><span class="boring">            let distance = transform.translation.truncate().distance(target);
+</span><span class="boring">
+</span><span class="boring">            let speed = speed * dt;
+</span><span class="boring">            if distance &lt; speed {
+</span><span class="boring">                transform.translation = target.extend(transform.translation.z);
+</span><span class="boring">                break;
+</span><span class="boring">            } else {
+</span><span class="boring">                transform.translation += direction.extend(0.0) * speed;
+</span><span class="boring">            }
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        next_frame().await;
+</span><span class="boring">    }
+</span><span class="boring">}</span></code></pre>
+<p>So we can easily just grab <code>Coroutines</code> resource and spawn jobs.</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">use bevy::{camera::ScalingMode, prelude::*};
+</span><span class="boring">use futures::join;
+</span><span class="boring">use moirai::{coroutine::spawn, job::JobLocation};
+</span><span class="boring">use moirai_bevy::{
+</span><span class="boring">    Coroutines, MoiraiPlugin,
+</span><span class="boring">    coroutine::{next_frame, wait_secs, world},
+</span><span class="boring">};
+</span><span class="boring">
+</span><span class="boring">fn main() {
+</span><span class="boring">    let mut app = App::new();
+</span><span class="boring">    app.add_plugins((DefaultPlugins, MoiraiPlugin))
+</span><span class="boring">        .add_systems(Startup, setup);
+</span><span class="boring">    app.run();
+</span><span class="boring">}
+</span><span class="boring">
+</span>fn setup(
+    mut commands: Commands,
+    asset_server: Res&lt;AssetServer&gt;,
+    mut meshes: ResMut&lt;Assets&lt;Mesh&gt;&gt;,
+    mut materials: ResMut&lt;Assets&lt;ColorMaterial&gt;&gt;,
+    coroutines: Res&lt;Coroutines&gt;,
+) {
+    let font = asset_server.load("noto.ttf");
+
+    commands.spawn((
+        Camera2d,
+        Projection::Orthographic(OrthographicProjection {
+            scaling_mode: ScalingMode::FixedVertical {
+                viewport_height: 500.0,
+            },
+            ..OrthographicProjection::default_2d()
+        }),
+    ));
+
+    let player_dialogue = commands
+        .spawn((
+            Text2d::default(),
+            TextFont {
+                font: font.clone(),
+                font_size: 20.0,
+                ..Default::default()
+            },
+            TextLayout::new_with_justify(Justify::Center).with_no_wrap(),
+            TextColor::WHITE,
+            Transform::from_xyz(0.0, 50.0, 0.0),
+        ))
+        .id();
+
+    let player = commands
+        .spawn((
+            Mesh2d(meshes.add(Circle::new(15.0))),
+            MeshMaterial2d(materials.add(Color::linear_rgb(0.0, 0.47, 0.95))),
+            Transform::from_xyz(-150.0, 0.0, 0.0),
+        ))
+        .add_child(player_dialogue)
+        .id();
+
+    let enemy_dialogue = commands
+        .spawn((
+            Text2d::default(),
+            TextFont {
+                font: font.clone(),
+                font_size: 20.0,
+                ..Default::default()
+            },
+            TextLayout::new_with_justify(Justify::Center).with_no_wrap(),
+            TextColor::WHITE,
+            Transform::from_xyz(0.0, 50.0, 0.0),
+        ))
+        .id();
+
+    let enemy = commands
+        .spawn((
+            Mesh2d(meshes.add(Rectangle::new(30.0, 30.0))),
+            MeshMaterial2d(materials.add(Color::linear_rgb(0.95, 0.16, 0.22))),
+            Transform::from_xyz(100.0, 0.0, 0.0),
+        ))
+        .add_child(enemy_dialogue)
+        .id();
+
+    coroutines.jobs.spawn(
+        JobLocation::Local,
+        cutscene(player, player_dialogue, enemy, enemy_dialogue),
+    );
+}
+<span class="boring">
+</span><span class="boring">async fn cutscene(player: Entity, player_dialogue: Entity, enemy: Entity, enemy_dialogue: Entity) {
+</span><span class="boring">    move_character(player, vec2(-100.0, 0.0), 50.0).await;
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(enemy_dialogue, "You dare challenge me, mortal?", 2.0).await;
+</span><span class="boring">
+</span><span class="boring">    move_character(player, vec2(-15.0, 0.0), 100.0).await;
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(player_dialogue, "I will defeat you!", 2.0).await;
+</span><span class="boring">
+</span><span class="boring">    move_character(enemy, vec2(15.0, 0.0), 80.0).await;
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(enemy_dialogue, "Prepare to meet your maker!", 2.0).await;
+</span><span class="boring">
+</span><span class="boring">    join!(
+</span><span class="boring">        spawn(
+</span><span class="boring">            JobLocation::Local,
+</span><span class="boring">            move_character(player, vec2(-50.0, 0.0), 150.0),
+</span><span class="boring">        ),
+</span><span class="boring">        spawn(
+</span><span class="boring">            JobLocation::Local,
+</span><span class="boring">            move_character(enemy, vec2(50.0, 0.0), 150.0),
+</span><span class="boring">        )
+</span><span class="boring">    );
+</span><span class="boring">
+</span><span class="boring">    join!(
+</span><span class="boring">        move_character(player, vec2(0.0, 0.0), 200.0),
+</span><span class="boring">        move_character(enemy, vec2(0.0, 0.0), 200.0)
+</span><span class="boring">    );
+</span><span class="boring">
+</span><span class="boring">    join!(
+</span><span class="boring">        move_character(player, vec2(-150.0, 0.0), 200.0),
+</span><span class="boring">        move_character(enemy, vec2(-15.0, 0.0), 50.0),
+</span><span class="boring">    );
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(player_dialogue, "Argh! Such pain!", 2.0).await;
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(enemy_dialogue, "Victory is mine!", 2.0).await;
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(player_dialogue, "You've won!", 1.0).await;
+</span><span class="boring">    timed_dialogue(player_dialogue, "I surrender...!", 1.0).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn show_dialogue(dialogue: Entity, content: impl ToString) {
+</span><span class="boring">    let world = world().await;
+</span><span class="boring">    let world = &amp;mut *world.write().unwrap();
+</span><span class="boring">    let mut text = world.get_mut::&lt;Text2d&gt;(dialogue).unwrap();
+</span><span class="boring">    text.0 = content.to_string();
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn hide_dialogue(dialogue: Entity) {
+</span><span class="boring">    let world = world().await;
+</span><span class="boring">    let world = &amp;mut *world.write().unwrap();
+</span><span class="boring">    let mut text = world.get_mut::&lt;Text2d&gt;(dialogue).unwrap();
+</span><span class="boring">    text.0.clear();
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn timed_dialogue(dialogue: Entity, text: impl ToString, duration: f32) {
+</span><span class="boring">    show_dialogue(dialogue, text).await;
+</span><span class="boring">    wait_secs(duration).await;
+</span><span class="boring">    hide_dialogue(dialogue).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn move_character(character: Entity, target: Vec2, speed: f32) {
+</span><span class="boring">    loop {
+</span><span class="boring">        {
+</span><span class="boring">            let world = world().await;
+</span><span class="boring">            let world = &amp;mut *world.write().unwrap();
+</span><span class="boring">            let dt = world.resource::&lt;Time&gt;().delta_secs();
+</span><span class="boring">
+</span><span class="boring">            let mut transform = world.get_mut::&lt;Transform&gt;(character).unwrap();
+</span><span class="boring">            let direction = (target - transform.translation.truncate()).normalize_or_zero();
+</span><span class="boring">            let distance = transform.translation.truncate().distance(target);
+</span><span class="boring">
+</span><span class="boring">            let speed = speed * dt;
+</span><span class="boring">            if distance &lt; speed {
+</span><span class="boring">                transform.translation = target.extend(transform.translation.z);
+</span><span class="boring">                break;
+</span><span class="boring">            } else {
+</span><span class="boring">                transform.translation += direction.extend(0.0) * speed;
+</span><span class="boring">            }
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        next_frame().await;
+</span><span class="boring">    }
+</span><span class="boring">}</span></code></pre>
+<p>For world manipulation, we can access entire ECS world.</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">use bevy::{camera::ScalingMode, prelude::*};
+</span><span class="boring">use futures::join;
+</span><span class="boring">use moirai::{coroutine::spawn, job::JobLocation};
+</span><span class="boring">use moirai_bevy::{
+</span><span class="boring">    Coroutines, MoiraiPlugin,
+</span><span class="boring">    coroutine::{next_frame, wait_secs, world},
+</span><span class="boring">};
+</span><span class="boring">
+</span><span class="boring">fn main() {
+</span><span class="boring">    let mut app = App::new();
+</span><span class="boring">    app.add_plugins((DefaultPlugins, MoiraiPlugin))
+</span><span class="boring">        .add_systems(Startup, setup);
+</span><span class="boring">    app.run();
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">fn setup(
+</span><span class="boring">    mut commands: Commands,
+</span><span class="boring">    asset_server: Res&lt;AssetServer&gt;,
+</span><span class="boring">    mut meshes: ResMut&lt;Assets&lt;Mesh&gt;&gt;,
+</span><span class="boring">    mut materials: ResMut&lt;Assets&lt;ColorMaterial&gt;&gt;,
+</span><span class="boring">    coroutines: Res&lt;Coroutines&gt;,
+</span><span class="boring">) {
+</span><span class="boring">    let font = asset_server.load("noto.ttf");
+</span><span class="boring">
+</span><span class="boring">    commands.spawn((
+</span><span class="boring">        Camera2d,
+</span><span class="boring">        Projection::Orthographic(OrthographicProjection {
+</span><span class="boring">            scaling_mode: ScalingMode::FixedVertical {
+</span><span class="boring">                viewport_height: 500.0,
+</span><span class="boring">            },
+</span><span class="boring">            ..OrthographicProjection::default_2d()
+</span><span class="boring">        }),
+</span><span class="boring">    ));
+</span><span class="boring">
+</span><span class="boring">    let player_dialogue = commands
+</span><span class="boring">        .spawn((
+</span><span class="boring">            Text2d::default(),
+</span><span class="boring">            TextFont {
+</span><span class="boring">                font: font.clone(),
+</span><span class="boring">                font_size: 20.0,
+</span><span class="boring">                ..Default::default()
+</span><span class="boring">            },
+</span><span class="boring">            TextLayout::new_with_justify(Justify::Center).with_no_wrap(),
+</span><span class="boring">            TextColor::WHITE,
+</span><span class="boring">            Transform::from_xyz(0.0, 50.0, 0.0),
+</span><span class="boring">        ))
+</span><span class="boring">        .id();
+</span><span class="boring">
+</span><span class="boring">    let player = commands
+</span><span class="boring">        .spawn((
+</span><span class="boring">            Mesh2d(meshes.add(Circle::new(15.0))),
+</span><span class="boring">            MeshMaterial2d(materials.add(Color::linear_rgb(0.0, 0.47, 0.95))),
+</span><span class="boring">            Transform::from_xyz(-150.0, 0.0, 0.0),
+</span><span class="boring">        ))
+</span><span class="boring">        .add_child(player_dialogue)
+</span><span class="boring">        .id();
+</span><span class="boring">
+</span><span class="boring">    let enemy_dialogue = commands
+</span><span class="boring">        .spawn((
+</span><span class="boring">            Text2d::default(),
+</span><span class="boring">            TextFont {
+</span><span class="boring">                font: font.clone(),
+</span><span class="boring">                font_size: 20.0,
+</span><span class="boring">                ..Default::default()
+</span><span class="boring">            },
+</span><span class="boring">            TextLayout::new_with_justify(Justify::Center).with_no_wrap(),
+</span><span class="boring">            TextColor::WHITE,
+</span><span class="boring">            Transform::from_xyz(0.0, 50.0, 0.0),
+</span><span class="boring">        ))
+</span><span class="boring">        .id();
+</span><span class="boring">
+</span><span class="boring">    let enemy = commands
+</span><span class="boring">        .spawn((
+</span><span class="boring">            Mesh2d(meshes.add(Rectangle::new(30.0, 30.0))),
+</span><span class="boring">            MeshMaterial2d(materials.add(Color::linear_rgb(0.95, 0.16, 0.22))),
+</span><span class="boring">            Transform::from_xyz(100.0, 0.0, 0.0),
+</span><span class="boring">        ))
+</span><span class="boring">        .add_child(enemy_dialogue)
+</span><span class="boring">        .id();
+</span><span class="boring">
+</span><span class="boring">    coroutines.jobs.spawn(
+</span><span class="boring">        JobLocation::Local,
+</span><span class="boring">        cutscene(player, player_dialogue, enemy, enemy_dialogue),
+</span><span class="boring">    );
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn cutscene(player: Entity, player_dialogue: Entity, enemy: Entity, enemy_dialogue: Entity) {
+</span><span class="boring">    move_character(player, vec2(-100.0, 0.0), 50.0).await;
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(enemy_dialogue, "You dare challenge me, mortal?", 2.0).await;
+</span><span class="boring">
+</span><span class="boring">    move_character(player, vec2(-15.0, 0.0), 100.0).await;
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(player_dialogue, "I will defeat you!", 2.0).await;
+</span><span class="boring">
+</span><span class="boring">    move_character(enemy, vec2(15.0, 0.0), 80.0).await;
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(enemy_dialogue, "Prepare to meet your maker!", 2.0).await;
+</span><span class="boring">
+</span><span class="boring">    join!(
+</span><span class="boring">        spawn(
+</span><span class="boring">            JobLocation::Local,
+</span><span class="boring">            move_character(player, vec2(-50.0, 0.0), 150.0),
+</span><span class="boring">        ),
+</span><span class="boring">        spawn(
+</span><span class="boring">            JobLocation::Local,
+</span><span class="boring">            move_character(enemy, vec2(50.0, 0.0), 150.0),
+</span><span class="boring">        )
+</span><span class="boring">    );
+</span><span class="boring">
+</span><span class="boring">    join!(
+</span><span class="boring">        move_character(player, vec2(0.0, 0.0), 200.0),
+</span><span class="boring">        move_character(enemy, vec2(0.0, 0.0), 200.0)
+</span><span class="boring">    );
+</span><span class="boring">
+</span><span class="boring">    join!(
+</span><span class="boring">        move_character(player, vec2(-150.0, 0.0), 200.0),
+</span><span class="boring">        move_character(enemy, vec2(-15.0, 0.0), 50.0),
+</span><span class="boring">    );
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(player_dialogue, "Argh! Such pain!", 2.0).await;
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(enemy_dialogue, "Victory is mine!", 2.0).await;
+</span><span class="boring">
+</span><span class="boring">    timed_dialogue(player_dialogue, "You've won!", 1.0).await;
+</span><span class="boring">    timed_dialogue(player_dialogue, "I surrender...!", 1.0).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span>async fn show_dialogue(dialogue: Entity, content: impl ToString) {
+    let world = world().await;
+    let world = &amp;mut *world.write().unwrap();
+    let mut text = world.get_mut::&lt;Text2d&gt;(dialogue).unwrap();
+    text.0 = content.to_string();
+}
+<span class="boring">
+</span><span class="boring">async fn hide_dialogue(dialogue: Entity) {
+</span><span class="boring">    let world = world().await;
+</span><span class="boring">    let world = &amp;mut *world.write().unwrap();
+</span><span class="boring">    let mut text = world.get_mut::&lt;Text2d&gt;(dialogue).unwrap();
+</span><span class="boring">    text.0.clear();
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn timed_dialogue(dialogue: Entity, text: impl ToString, duration: f32) {
+</span><span class="boring">    show_dialogue(dialogue, text).await;
+</span><span class="boring">    wait_secs(duration).await;
+</span><span class="boring">    hide_dialogue(dialogue).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn move_character(character: Entity, target: Vec2, speed: f32) {
+</span><span class="boring">    loop {
+</span><span class="boring">        {
+</span><span class="boring">            let world = world().await;
+</span><span class="boring">            let world = &amp;mut *world.write().unwrap();
+</span><span class="boring">            let dt = world.resource::&lt;Time&gt;().delta_secs();
+</span><span class="boring">
+</span><span class="boring">            let mut transform = world.get_mut::&lt;Transform&gt;(character).unwrap();
+</span><span class="boring">            let direction = (target - transform.translation.truncate()).normalize_or_zero();
+</span><span class="boring">            let distance = transform.translation.truncate().distance(target);
+</span><span class="boring">
+</span><span class="boring">            let speed = speed * dt;
+</span><span class="boring">            if distance &lt; speed {
+</span><span class="boring">                transform.translation = target.extend(transform.translation.z);
+</span><span class="boring">                break;
+</span><span class="boring">            } else {
+</span><span class="boring">                transform.translation += direction.extend(0.0) * speed;
+</span><span class="boring">            }
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        next_frame().await;
+</span><span class="boring">    }
+</span><span class="boring">}</span></code></pre>
+<p>The cutscene coroutine we run looks like this:</p>
+<pre class="playground"><code class="language-rust no_run edition2024"><span class="boring">use bevy::{camera::ScalingMode, prelude::*};
+</span><span class="boring">use futures::join;
+</span><span class="boring">use moirai::{coroutine::spawn, job::JobLocation};
+</span><span class="boring">use moirai_bevy::{
+</span><span class="boring">    Coroutines, MoiraiPlugin,
+</span><span class="boring">    coroutine::{next_frame, wait_secs, world},
+</span><span class="boring">};
+</span><span class="boring">
+</span><span class="boring">fn main() {
+</span><span class="boring">    let mut app = App::new();
+</span><span class="boring">    app.add_plugins((DefaultPlugins, MoiraiPlugin))
+</span><span class="boring">        .add_systems(Startup, setup);
+</span><span class="boring">    app.run();
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">fn setup(
+</span><span class="boring">    mut commands: Commands,
+</span><span class="boring">    asset_server: Res&lt;AssetServer&gt;,
+</span><span class="boring">    mut meshes: ResMut&lt;Assets&lt;Mesh&gt;&gt;,
+</span><span class="boring">    mut materials: ResMut&lt;Assets&lt;ColorMaterial&gt;&gt;,
+</span><span class="boring">    coroutines: Res&lt;Coroutines&gt;,
+</span><span class="boring">) {
+</span><span class="boring">    let font = asset_server.load("noto.ttf");
+</span><span class="boring">
+</span><span class="boring">    commands.spawn((
+</span><span class="boring">        Camera2d,
+</span><span class="boring">        Projection::Orthographic(OrthographicProjection {
+</span><span class="boring">            scaling_mode: ScalingMode::FixedVertical {
+</span><span class="boring">                viewport_height: 500.0,
+</span><span class="boring">            },
+</span><span class="boring">            ..OrthographicProjection::default_2d()
+</span><span class="boring">        }),
+</span><span class="boring">    ));
+</span><span class="boring">
+</span><span class="boring">    let player_dialogue = commands
+</span><span class="boring">        .spawn((
+</span><span class="boring">            Text2d::default(),
+</span><span class="boring">            TextFont {
+</span><span class="boring">                font: font.clone(),
+</span><span class="boring">                font_size: 20.0,
+</span><span class="boring">                ..Default::default()
+</span><span class="boring">            },
+</span><span class="boring">            TextLayout::new_with_justify(Justify::Center).with_no_wrap(),
+</span><span class="boring">            TextColor::WHITE,
+</span><span class="boring">            Transform::from_xyz(0.0, 50.0, 0.0),
+</span><span class="boring">        ))
+</span><span class="boring">        .id();
+</span><span class="boring">
+</span><span class="boring">    let player = commands
+</span><span class="boring">        .spawn((
+</span><span class="boring">            Mesh2d(meshes.add(Circle::new(15.0))),
+</span><span class="boring">            MeshMaterial2d(materials.add(Color::linear_rgb(0.0, 0.47, 0.95))),
+</span><span class="boring">            Transform::from_xyz(-150.0, 0.0, 0.0),
+</span><span class="boring">        ))
+</span><span class="boring">        .add_child(player_dialogue)
+</span><span class="boring">        .id();
+</span><span class="boring">
+</span><span class="boring">    let enemy_dialogue = commands
+</span><span class="boring">        .spawn((
+</span><span class="boring">            Text2d::default(),
+</span><span class="boring">            TextFont {
+</span><span class="boring">                font: font.clone(),
+</span><span class="boring">                font_size: 20.0,
+</span><span class="boring">                ..Default::default()
+</span><span class="boring">            },
+</span><span class="boring">            TextLayout::new_with_justify(Justify::Center).with_no_wrap(),
+</span><span class="boring">            TextColor::WHITE,
+</span><span class="boring">            Transform::from_xyz(0.0, 50.0, 0.0),
+</span><span class="boring">        ))
+</span><span class="boring">        .id();
+</span><span class="boring">
+</span><span class="boring">    let enemy = commands
+</span><span class="boring">        .spawn((
+</span><span class="boring">            Mesh2d(meshes.add(Rectangle::new(30.0, 30.0))),
+</span><span class="boring">            MeshMaterial2d(materials.add(Color::linear_rgb(0.95, 0.16, 0.22))),
+</span><span class="boring">            Transform::from_xyz(100.0, 0.0, 0.0),
+</span><span class="boring">        ))
+</span><span class="boring">        .add_child(enemy_dialogue)
+</span><span class="boring">        .id();
+</span><span class="boring">
+</span><span class="boring">    coroutines.jobs.spawn(
+</span><span class="boring">        JobLocation::Local,
+</span><span class="boring">        cutscene(player, player_dialogue, enemy, enemy_dialogue),
+</span><span class="boring">    );
+</span><span class="boring">}
+</span><span class="boring">
+</span>async fn cutscene(player: Entity, player_dialogue: Entity, enemy: Entity, enemy_dialogue: Entity) {
+    move_character(player, vec2(-100.0, 0.0), 50.0).await;
+
+    timed_dialogue(enemy_dialogue, "You dare challenge me, mortal?", 2.0).await;
+
+    move_character(player, vec2(-15.0, 0.0), 100.0).await;
+
+    timed_dialogue(player_dialogue, "I will defeat you!", 2.0).await;
+
+    move_character(enemy, vec2(15.0, 0.0), 80.0).await;
+
+    timed_dialogue(enemy_dialogue, "Prepare to meet your maker!", 2.0).await;
+
+    join!(
+        spawn(
+            JobLocation::Local,
+            move_character(player, vec2(-50.0, 0.0), 150.0),
+        ),
+        spawn(
+            JobLocation::Local,
+            move_character(enemy, vec2(50.0, 0.0), 150.0),
+        )
+    );
+
+    join!(
+        move_character(player, vec2(0.0, 0.0), 200.0),
+        move_character(enemy, vec2(0.0, 0.0), 200.0)
+    );
+
+    join!(
+        move_character(player, vec2(-150.0, 0.0), 200.0),
+        move_character(enemy, vec2(-15.0, 0.0), 50.0),
+    );
+
+    timed_dialogue(player_dialogue, "Argh! Such pain!", 2.0).await;
+
+    timed_dialogue(enemy_dialogue, "Victory is mine!", 2.0).await;
+
+    timed_dialogue(player_dialogue, "You've won!", 1.0).await;
+    timed_dialogue(player_dialogue, "I surrender...!", 1.0).await;
+}
+<span class="boring">
+</span><span class="boring">async fn show_dialogue(dialogue: Entity, content: impl ToString) {
+</span><span class="boring">    let world = world().await;
+</span><span class="boring">    let world = &amp;mut *world.write().unwrap();
+</span><span class="boring">    let mut text = world.get_mut::&lt;Text2d&gt;(dialogue).unwrap();
+</span><span class="boring">    text.0 = content.to_string();
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn hide_dialogue(dialogue: Entity) {
+</span><span class="boring">    let world = world().await;
+</span><span class="boring">    let world = &amp;mut *world.write().unwrap();
+</span><span class="boring">    let mut text = world.get_mut::&lt;Text2d&gt;(dialogue).unwrap();
+</span><span class="boring">    text.0.clear();
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn timed_dialogue(dialogue: Entity, text: impl ToString, duration: f32) {
+</span><span class="boring">    show_dialogue(dialogue, text).await;
+</span><span class="boring">    wait_secs(duration).await;
+</span><span class="boring">    hide_dialogue(dialogue).await;
+</span><span class="boring">}
+</span><span class="boring">
+</span><span class="boring">async fn move_character(character: Entity, target: Vec2, speed: f32) {
+</span><span class="boring">    loop {
+</span><span class="boring">        {
+</span><span class="boring">            let world = world().await;
+</span><span class="boring">            let world = &amp;mut *world.write().unwrap();
+</span><span class="boring">            let dt = world.resource::&lt;Time&gt;().delta_secs();
+</span><span class="boring">
+</span><span class="boring">            let mut transform = world.get_mut::&lt;Transform&gt;(character).unwrap();
+</span><span class="boring">            let direction = (target - transform.translation.truncate()).normalize_or_zero();
+</span><span class="boring">            let distance = transform.translation.truncate().distance(target);
+</span><span class="boring">
+</span><span class="boring">            let speed = speed * dt;
+</span><span class="boring">            if distance &lt; speed {
+</span><span class="boring">                transform.translation = target.extend(transform.translation.z);
+</span><span class="boring">                break;
+</span><span class="boring">            } else {
+</span><span class="boring">                transform.translation += direction.extend(0.0) * speed;
+</span><span class="boring">            }
+</span><span class="boring">        }
+</span><span class="boring">
+</span><span class="boring">        next_frame().await;
+</span><span class="boring">    }
+</span><span class="boring">}</span></code></pre>
 
                     </main>
 
