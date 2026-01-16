@@ -132,14 +132,14 @@ async fn cutscene(player: Entity, player_dialogue: Entity, enemy: Entity, enemy_
 }
 /* ANCHOR_END: cutscene */
 
-/* ANCHOR: dialogue */
+/* ANCHOR: show-dialogue */
 async fn show_dialogue(dialogue: Entity, content: impl ToString) {
     let world = world().await;
     let world = &mut *world.write().unwrap();
     let mut text = world.get_mut::<Text2d>(dialogue).unwrap();
     text.0 = content.to_string();
 }
-/* ANCHOR_END: dialogue */
+/* ANCHOR_END: show-dialogue */
 
 async fn hide_dialogue(dialogue: Entity) {
     let world = world().await;

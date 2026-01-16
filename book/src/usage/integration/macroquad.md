@@ -11,3 +11,9 @@ Also, due to singleton-like nature of Macroquad, when using its scene graph, you
 ```rust,no_run
 {{#rustdoc_include ../../../samples/examples/macroquad_integration.rs:show-dialogue}}
 ```
+
+The cutscene coroutine we run looks like this:
+
+```rust,no_run
+{{#rustdoc_include ../../../samples/examples/macroquad_integration.rs:cutscene}}
+```
