@@ -12,8 +12,7 @@ test:
 
 miri:
   cargo +nightly miri test --manifest-path ./crates/_/Cargo.toml -- --nocapture
-  # TODO: Fix miri errors in ManagedBox lazy access - stacked borrows errors.
-  # cargo +nightly miri test --manifest-path ./crates/durable/Cargo.toml -- --nocapture
+  cargo +nightly miri test --manifest-path ./crates/durable/Cargo.toml -- --nocapture
   
 clippy:
   cargo clippy --all --all-features

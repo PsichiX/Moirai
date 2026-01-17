@@ -10,6 +10,7 @@ use crate::{
 use intuicio_data::{
     managed::{DynamicManagedLazy, ManagedLazy},
     managed_box::DynamicManagedBox,
+    managed_gc::DynamicManagedGc,
     type_hash::TypeHash,
 };
 use std::{
@@ -89,6 +90,7 @@ impl JobsTags {
 #[derive(Clone)]
 pub enum JobsMetaValue {
     Boxed(DynamicManagedBox),
+    Gc(DynamicManagedGc),
     Lazy(DynamicManagedLazy),
 }
 
@@ -96,6 +98,7 @@ impl JobsMetaValue {
     pub fn lazy(&self) -> DynamicManagedLazy {
         match self {
             JobsMetaValue::Boxed(boxed) => boxed.lazy(),
+            JobsMetaValue::Gc(gc) => gc.lazy(),
             JobsMetaValue::Lazy(lazy) => lazy.clone(),
         }
     }
@@ -104,6 +107,12 @@ impl JobsMetaValue {
 impl From<DynamicManagedBox> for JobsMetaValue {
     fn from(value: DynamicManagedBox) -> Self {
         JobsMetaValue::Boxed(value)
+    }
+}
+
+impl From<DynamicManagedGc> for JobsMetaValue {
+    fn from(value: DynamicManagedGc) -> Self {
+        JobsMetaValue::Gc(value)
     }
 }
 

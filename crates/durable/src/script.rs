@@ -1,4 +1,4 @@
-use intuicio_data::managed_box::ManagedBox;
+use intuicio_data::managed_gc::ManagedGc;
 use moirai::{job::JobObject, jobs::JobsWaker};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_intermediate::{Intermediate, from_intermediate, to_intermediate};
@@ -183,7 +183,7 @@ impl Operation {
         scope: &mut [Self],
         level: usize,
         locations: &mut Vec<Location>,
-        serializable_stack: &mut ManagedBox<DataStack>,
+        serializable_stack: &mut ManagedGc<DataStack>,
         curent_future: &mut Option<BoxFuture>,
         cx: &mut Context<'_>,
     ) -> Poll<()> {
@@ -210,7 +210,7 @@ impl Operation {
             Operation::Scope { body } => {
                 if locations.len() <= level + 1 {
                     locations.push(Location::Scope { position: 0 });
-                    serializable_stack.write().unwrap().push(());
+                    serializable_stack.try_write().unwrap().push(());
                 }
                 match Self::poll_scope(
                     body,
@@ -223,7 +223,7 @@ impl Operation {
                     Poll::Ready(()) => {
                         locations[level].increment_position();
                         locations.pop();
-                        serializable_stack.write().unwrap().pop_raw();
+                        serializable_stack.try_write().unwrap().pop_raw();
                     }
                     Poll::Pending => {}
                 }
@@ -270,7 +270,7 @@ impl Operation {
                         Poll::Ready(()) => {
                             locations[level + 1].increment_counter();
                             locations.pop();
-                            serializable_stack.write().unwrap().pop_raw();
+                            serializable_stack.try_write().unwrap().pop_raw();
                         }
                         Poll::Pending => {}
                     }
@@ -291,8 +291,8 @@ impl Operation {
 
 pub struct MoiraiScopeBuilder<T: Send + Serialize + DeserializeOwned + 'static> {
     serialization: Serialization,
-    serializable_stack: ManagedBox<DataStack>,
-    transient_stack: ManagedBox<DataStack>,
+    serializable_stack: ManagedGc<DataStack>,
+    transient_stack: ManagedGc<DataStack>,
     scope: Script,
     _phantom: PhantomData<fn() -> T>,
 }
@@ -300,8 +300,8 @@ pub struct MoiraiScopeBuilder<T: Send + Serialize + DeserializeOwned + 'static> 
 impl<T: Send + Serialize + DeserializeOwned + 'static> MoiraiScopeBuilder<T> {
     fn new(
         serialization: Serialization,
-        serializable_stack: ManagedBox<DataStack>,
-        transient_stack: ManagedBox<DataStack>,
+        serializable_stack: ManagedGc<DataStack>,
+        transient_stack: ManagedGc<DataStack>,
     ) -> Self {
         Self {
             serialization,
@@ -335,9 +335,9 @@ impl<T: Send + Serialize + DeserializeOwned + 'static> MoiraiScopeBuilder<T> {
                 let future = future.clone();
                 let mut sub_stack = sub_stack.clone();
                 Box::pin(async move {
-                    let input = sub_stack.write().unwrap().pop::<T>();
+                    let input = sub_stack.try_write().unwrap().pop::<T>();
                     let output = future(input).await;
-                    sub_stack.write().unwrap().push(output);
+                    sub_stack.try_write().unwrap().push(output);
                 })
             }),
         });
@@ -370,9 +370,9 @@ impl<T: Send + Serialize + DeserializeOwned + 'static> MoiraiScopeBuilder<T> {
                 let future = future.clone();
                 let mut sub_stack = sub_stack.clone();
                 Box::pin(async move {
-                    let input = sub_stack.write().unwrap().pop::<T>();
+                    let input = sub_stack.try_write().unwrap().pop::<T>();
                     let output = future(input);
-                    sub_stack.write().unwrap().push(output);
+                    sub_stack.try_write().unwrap().push(output);
                 })
             }),
         });
@@ -441,20 +441,20 @@ impl<T: Send + Serialize + DeserializeOwned + 'static> MoiraiScopeBuilder<T> {
         let mut fetch_transient_stack = transient_stack.clone();
         scope.push(Operation::Iterator {
             extract: Box::new(move |counter| {
-                let value = extract_serializable_stack.write().unwrap().pop::<T>();
+                let value = extract_serializable_stack.try_write().unwrap().pop::<T>();
                 let iter = extract(&value, counter);
-                extract_transient_stack.write().unwrap().push(iter);
-                extract_serializable_stack.write().unwrap().push(value);
+                extract_transient_stack.try_write().unwrap().push(iter);
+                extract_serializable_stack.try_write().unwrap().push(value);
             }),
             fetch: Box::new(move || {
-                let mut iter = fetch_transient_stack.write().unwrap().pop::<I>();
+                let mut iter = fetch_transient_stack.try_write().unwrap().pop::<I>();
                 let result = if let Some(item) = iter.next() {
-                    fetch_serializable_stack.write().unwrap().push(item);
+                    fetch_serializable_stack.try_write().unwrap().push(item);
                     true
                 } else {
                     false
                 };
-                fetch_transient_stack.write().unwrap().push(iter);
+                fetch_transient_stack.try_write().unwrap().push(iter);
                 result
             }),
             body: builder.scope,
@@ -494,20 +494,20 @@ impl<T: Send + Serialize + DeserializeOwned + 'static> MoiraiScopeBuilder<T> {
         let mut fetch_transient_stack = transient_stack.clone();
         scope.push(Operation::Iterator {
             extract: Box::new(move |counter| {
-                let mut value = extract_serializable_stack.write().unwrap().pop::<T>();
+                let mut value = extract_serializable_stack.try_write().unwrap().pop::<T>();
                 let iter = extract(&mut value, counter);
-                extract_transient_stack.write().unwrap().push(iter);
-                extract_serializable_stack.write().unwrap().push(value);
+                extract_transient_stack.try_write().unwrap().push(iter);
+                extract_serializable_stack.try_write().unwrap().push(value);
             }),
             fetch: Box::new(move || {
-                let mut iter = fetch_transient_stack.write().unwrap().pop::<I>();
+                let mut iter = fetch_transient_stack.try_write().unwrap().pop::<I>();
                 let result = if let Some(item) = iter.next() {
-                    fetch_serializable_stack.write().unwrap().push(item);
+                    fetch_serializable_stack.try_write().unwrap().push(item);
                     true
                 } else {
                     false
                 };
-                fetch_transient_stack.write().unwrap().push(iter);
+                fetch_transient_stack.try_write().unwrap().push(iter);
                 result
             }),
             body: builder.scope,
@@ -523,10 +523,10 @@ impl<T: Send + Serialize + DeserializeOwned + 'static> MoiraiScopeBuilder<T> {
 }
 
 pub struct MoiraiScript<T: Send + Serialize + DeserializeOwned + 'static> {
-    serialization: ManagedBox<Serialization>,
-    serializable_stack: ManagedBox<DataStack>,
-    transient_stack: ManagedBox<DataStack>,
-    location_stack: ManagedBox<Vec<Location>>,
+    serialization: ManagedGc<Serialization>,
+    serializable_stack: ManagedGc<DataStack>,
+    transient_stack: ManagedGc<DataStack>,
+    location_stack: ManagedGc<Vec<Location>>,
     scope: Script,
     current_future: Option<BoxFuture>,
     _phantom: PhantomData<fn() -> T>,
@@ -536,8 +536,8 @@ impl<T: Send + Serialize + DeserializeOwned + 'static> MoiraiScript<T> {
     pub fn new(f: impl FnOnce(MoiraiScopeBuilder<()>) -> MoiraiScopeBuilder<T>) -> Self {
         let mut serialization = Serialization::default();
         serialization.register::<T>();
-        let serializable_stack = ManagedBox::new(DataStack::default());
-        let transient_stack = ManagedBox::new(DataStack::default());
+        let serializable_stack = ManagedGc::new(DataStack::default());
+        let transient_stack = ManagedGc::new(DataStack::default());
         let builder = f(MoiraiScopeBuilder::<()>::new(
             serialization,
             serializable_stack.clone(),
@@ -546,7 +546,7 @@ impl<T: Send + Serialize + DeserializeOwned + 'static> MoiraiScript<T> {
         let serialization = builder.serialization;
         let scope = builder.scope;
         Self {
-            serialization: ManagedBox::new(serialization),
+            serialization: ManagedGc::new(serialization),
             serializable_stack,
             transient_stack,
             location_stack: Default::default(),
@@ -573,7 +573,7 @@ impl<T: Send + Serialize + DeserializeOwned + 'static> MoiraiScript<T> {
             .into_typed::<Vec<Location>>()
             .ok()?;
         // TODO: miri throws stacked borrows errors pointing here. need to fix
-        // ManagedBox lazy access, as retag doesn't see created references.
+        // ManagedGc lazy access, as retag doesn't see created references.
         let serializable_stack_snapshot = serializable_stack
             .read()
             .unwrap()
@@ -597,15 +597,16 @@ impl<T: Send + Serialize + DeserializeOwned + 'static> MoiraiScript<T> {
         })
     }
 
+    #[allow(clippy::result_large_err)]
     pub fn rehydrate(mut self, snapshot: MoiraiScriptSnapshot) -> Result<Self, Self> {
         let Some(serializable_stack) = snapshot
             .serializable_stack
-            .deserialize(&self.serialization.read().unwrap())
+            .deserialize(&self.serialization.try_read().unwrap())
         else {
             return Err(self);
         };
-        *self.serializable_stack.write().unwrap() = serializable_stack;
-        *self.location_stack.write().unwrap() = snapshot.location_stack;
+        *self.serializable_stack.try_write().unwrap() = serializable_stack;
+        *self.location_stack.try_write().unwrap() = snapshot.location_stack;
         Ok(self)
     }
 }
@@ -616,18 +617,18 @@ impl<T: Send + Serialize + DeserializeOwned + 'static> Future for MoiraiScript<T
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = &mut *self;
         let location_stack_lazy = this.location_stack.lazy();
-        let Some(mut location_stack) = this.location_stack.write() else {
+        let Some(mut location_stack) = this.location_stack.try_write() else {
             return Poll::Pending;
         };
         if location_stack.is_empty() {
             location_stack.push(Location::Scope { position: 0 });
-            this.serializable_stack.write().unwrap().push(());
+            this.serializable_stack.try_write().unwrap().push(());
             if let Some(waker) = JobsWaker::try_cast(cx.waker()) {
                 let runtime = unsafe { waker.runtime() };
                 runtime
                     .local_meta
                     .set(SERIALIZATION, this.serialization.lazy().into_dynamic());
-                // TODO: this violates stacked borrows rules, need to fix ManagedBox lazy access.
+                // TODO: this violates stacked borrows rules, need to fix ManagedGc lazy access.
                 // It happen only at some specific points during dehydration.
                 runtime.local_meta.set(
                     SERIALIZABLE_STACK,
@@ -652,10 +653,10 @@ impl<T: Send + Serialize + DeserializeOwned + 'static> Future for MoiraiScript<T
             Poll::Ready(()) => {
                 location_stack.pop();
                 assert!(location_stack.is_empty());
-                this.transient_stack.write().unwrap().pop_raw();
-                assert!(this.transient_stack.read().unwrap().stack.is_empty());
-                assert_eq!(this.serializable_stack.read().unwrap().stack.len(), 1);
-                Poll::Ready(this.serializable_stack.write().unwrap().pop::<T>())
+                this.transient_stack.try_write().unwrap().pop_raw();
+                assert!(this.transient_stack.try_read().unwrap().stack.is_empty());
+                assert_eq!(this.serializable_stack.try_read().unwrap().stack.len(), 1);
+                Poll::Ready(this.serializable_stack.try_write().unwrap().pop::<T>())
             }
             Poll::Pending => Poll::Pending,
         }
