@@ -1,4 +1,4 @@
-use intuicio_data::managed_gc::ManagedGc;
+use intuicio_data::managed::gc::ManagedGc;
 use moirai::{job::JobObject, jobs::JobsWaker};
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_intermediate::{Intermediate, from_intermediate, to_intermediate};
@@ -329,11 +329,11 @@ impl<T: Send + Serialize + DeserializeOwned + 'static> MoiraiScopeBuilder<T> {
         } = self;
         serialization.register::<T2>();
         let future = Arc::new(future);
-        let sub_stack = serializable_stack.clone();
+        let sub_stack = serializable_stack.reference();
         scope.push(Operation::Future {
             future: Box::new(move || {
                 let future = future.clone();
-                let mut sub_stack = sub_stack.clone();
+                let mut sub_stack = sub_stack.reference();
                 Box::pin(async move {
                     let input = sub_stack.try_write().unwrap().pop::<T>();
                     let output = future(input).await;
@@ -364,11 +364,11 @@ impl<T: Send + Serialize + DeserializeOwned + 'static> MoiraiScopeBuilder<T> {
         } = self;
         serialization.register::<T2>();
         let future = Arc::new(future);
-        let sub_stack = serializable_stack.clone();
+        let sub_stack = serializable_stack.reference();
         scope.push(Operation::Future {
             future: Box::new(move || {
                 let future = future.clone();
-                let mut sub_stack = sub_stack.clone();
+                let mut sub_stack = sub_stack.reference();
                 Box::pin(async move {
                     let input = sub_stack.try_write().unwrap().pop::<T>();
                     let output = future(input);
@@ -400,8 +400,8 @@ impl<T: Send + Serialize + DeserializeOwned + 'static> MoiraiScopeBuilder<T> {
         serialization.register::<T2>();
         let builder = body(MoiraiScopeBuilder::<()>::new(
             serialization,
-            serializable_stack.clone(),
-            transient_stack.clone(),
+            serializable_stack.reference(),
+            transient_stack.reference(),
         ));
         scope.push(Operation::Scope {
             body: builder.scope,
@@ -432,13 +432,13 @@ impl<T: Send + Serialize + DeserializeOwned + 'static> MoiraiScopeBuilder<T> {
         serialization.register::<I::Item>();
         let builder = body(MoiraiScopeBuilder::<I::Item>::new(
             serialization,
-            serializable_stack.clone(),
-            transient_stack.clone(),
+            serializable_stack.reference(),
+            transient_stack.reference(),
         ));
-        let mut extract_serializable_stack = serializable_stack.clone();
-        let mut extract_transient_stack = transient_stack.clone();
-        let mut fetch_serializable_stack = serializable_stack.clone();
-        let mut fetch_transient_stack = transient_stack.clone();
+        let mut extract_serializable_stack = serializable_stack.reference();
+        let mut extract_transient_stack = transient_stack.reference();
+        let mut fetch_serializable_stack = serializable_stack.reference();
+        let mut fetch_transient_stack = transient_stack.reference();
         scope.push(Operation::Iterator {
             extract: Box::new(move |counter| {
                 let value = extract_serializable_stack.try_write().unwrap().pop::<T>();
@@ -485,13 +485,13 @@ impl<T: Send + Serialize + DeserializeOwned + 'static> MoiraiScopeBuilder<T> {
         serialization.register::<I::Item>();
         let builder = body(MoiraiScopeBuilder::<I::Item>::new(
             serialization,
-            serializable_stack.clone(),
-            transient_stack.clone(),
+            serializable_stack.reference(),
+            transient_stack.reference(),
         ));
-        let mut extract_serializable_stack = serializable_stack.clone();
-        let mut extract_transient_stack = transient_stack.clone();
-        let mut fetch_serializable_stack = serializable_stack.clone();
-        let mut fetch_transient_stack = transient_stack.clone();
+        let mut extract_serializable_stack = serializable_stack.reference();
+        let mut extract_transient_stack = transient_stack.reference();
+        let mut fetch_serializable_stack = serializable_stack.reference();
+        let mut fetch_transient_stack = transient_stack.reference();
         scope.push(Operation::Iterator {
             extract: Box::new(move |counter| {
                 let mut value = extract_serializable_stack.try_write().unwrap().pop::<T>();
@@ -540,8 +540,8 @@ impl<T: Send + Serialize + DeserializeOwned + 'static> MoiraiScript<T> {
         let transient_stack = ManagedGc::new(DataStack::default());
         let builder = f(MoiraiScopeBuilder::<()>::new(
             serialization,
-            serializable_stack.clone(),
-            transient_stack.clone(),
+            serializable_stack.reference(),
+            transient_stack.reference(),
         ));
         let serialization = builder.serialization;
         let scope = builder.scope;

@@ -8,9 +8,7 @@ use crate::{
     third_party::time::Duration,
 };
 use intuicio_data::{
-    managed::{DynamicManagedLazy, ManagedLazy},
-    managed_box::DynamicManagedBox,
-    managed_gc::DynamicManagedGc,
+    managed::{DynamicManagedLazy, ManagedLazy, gc::DynamicManagedGc},
     type_hash::TypeHash,
 };
 use std::{
@@ -87,9 +85,7 @@ impl JobsTags {
     }
 }
 
-#[derive(Clone)]
 pub enum JobsMetaValue {
-    Boxed(DynamicManagedBox),
     Gc(DynamicManagedGc),
     Lazy(DynamicManagedLazy),
 }
@@ -97,16 +93,18 @@ pub enum JobsMetaValue {
 impl JobsMetaValue {
     pub fn lazy(&self) -> DynamicManagedLazy {
         match self {
-            JobsMetaValue::Boxed(boxed) => boxed.lazy(),
             JobsMetaValue::Gc(gc) => gc.lazy(),
             JobsMetaValue::Lazy(lazy) => lazy.clone(),
         }
     }
 }
 
-impl From<DynamicManagedBox> for JobsMetaValue {
-    fn from(value: DynamicManagedBox) -> Self {
-        JobsMetaValue::Boxed(value)
+impl Clone for JobsMetaValue {
+    fn clone(&self) -> Self {
+        match self {
+            JobsMetaValue::Gc(gc) => JobsMetaValue::Gc(gc.reference()),
+            JobsMetaValue::Lazy(lazy) => JobsMetaValue::Lazy(lazy.clone()),
+        }
     }
 }
 
