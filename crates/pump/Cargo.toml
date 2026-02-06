@@ -1,17 +1,18 @@
 [package]
-name = "moirai-durable"
+name = "moirai-pump"
 version = "0.8.3"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
-description = "Durable future support for Moirai job system"
+description = "Event-pump runtime for Moirai job system"
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/PsichiX/moirai"
 repository = "https://github.com/PsichiX/moirai"
-documentation = "https://docs.rs/moirai-durable"
+documentation = "https://docs.rs/moirai-pump"
 readme = "../../README.md"
 
 [dependencies]
 moirai = { version = "0.8", path = "../_" }
-intuicio-data = "0.51"
-serde-intermediate = "1.6"
-serde = { version = "1", features = ["derive"] }
+flume = { version = "0.12", default-features = false, features = ["async"] }
+
+[dev-dependencies]
+pollster = { version = "0.4", features = ["macro"] }

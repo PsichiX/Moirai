@@ -38,6 +38,7 @@ list-outdated:
 update:
   cargo update --manifest-path ./crates/_/Cargo.toml --aggressive
   cargo update --manifest-path ./crates/durable/Cargo.toml --aggressive
+  cargo update --manifest-path ./crates/pump/Cargo.toml --aggressive
   cargo update --manifest-path ./crates/bevy/Cargo.toml --aggressive
 
 book:
@@ -50,5 +51,7 @@ publish:
   cargo publish --no-verify --manifest-path ./crates/_/Cargo.toml
   sleep 1
   cargo publish --no-verify --manifest-path ./crates/durable/Cargo.toml
+  sleep 1
+  cargo publish --no-verify --manifest-path ./crates/pump/Cargo.toml
   sleep 1
   cargo publish --no-verify --manifest-path ./crates/bevy/Cargo.toml
