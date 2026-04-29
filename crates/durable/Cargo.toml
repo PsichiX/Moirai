@@ -1,6 +1,6 @@
 [package]
 name = "moirai-durable"
-version = "0.8.3"
+version = "0.8.4"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Durable future support for Moirai job system"
@@ -12,6 +12,6 @@ readme = "../../README.md"
 
 [dependencies]
 moirai = { version = "0.8", path = "../_" }
-intuicio-data = "0.51"
+intuicio-data = "0.52"
 serde-intermediate = "1.6"
 serde = { version = "1", features = ["derive"] }
