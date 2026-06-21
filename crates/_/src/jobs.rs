@@ -629,6 +629,7 @@ impl JobsWaker {
     }
 }
 
+#[allow(clippy::manual_noop_waker)]
 impl Wake for JobsWaker {
     fn wake(self: Arc<Self>) {}
 }

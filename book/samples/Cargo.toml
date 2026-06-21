@@ -1,6 +1,6 @@
 [package]
 name = "moirai-book-samples"
-version = "0.8.4"
+version = "0.8.5"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 publish = false
@@ -11,7 +11,7 @@ moirai-bevy = { version = "0.8", path = "../../crates/bevy" }
 crossterm = "0.29"
 vek = "0.17"
 textwrap = "0.16"
-rand = "0.9"
+rand = "0.10"
 futures = "0.3"
 macroquad = "0.4"
-bevy = { version = "0.18", default-features = false, features = ["2d"] }
+bevy = { version = "0.19", default-features = false, features = ["2d"] }

@@ -96,6 +96,7 @@ impl<T> GeneratorWaker<T> {
     }
 }
 
+#[allow(clippy::manual_noop_waker)]
 impl<T> Wake for GeneratorWaker<T> {
     fn wake(self: Arc<Self>) {}
 }

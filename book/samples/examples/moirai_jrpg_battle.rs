@@ -281,7 +281,7 @@ fn select_random_action(action_probabilities: &[(usize, Action)]) -> Action {
 async fn sword_swing(this: AsyncShared<Character>, target: AsyncShared<Character>) {
     {
         let mut target = target.write().unwrap();
-        target.health = target.health.saturating_sub(10).max(0);
+        target.health = target.health.saturating_sub(10);
     }
 
     log(format!(
@@ -328,7 +328,7 @@ async fn poison_spell_effect(target: AsyncShared<Character>) {
     for index in 0..6 {
         {
             let mut target = target.write().unwrap();
-            target.health = target.health.saturating_sub(5).max(0);
+            target.health = target.health.saturating_sub(5);
         }
 
         log(format!(
@@ -381,7 +381,7 @@ async fn fire_spell_effect(target: AsyncShared<Character>) {
         {
             // Deal high damage to target.
             let mut target = target.write().unwrap();
-            target.health = target.health.saturating_sub(20).max(0);
+            target.health = target.health.saturating_sub(20);
         }
 
         log(format!(

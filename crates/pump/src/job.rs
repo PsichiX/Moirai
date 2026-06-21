@@ -41,6 +41,10 @@ impl<T: Send + 'static> JobPump<T> {
         }
     }
 
+    pub fn is_complete(&self) -> bool {
+        self.queue.is_empty()
+    }
+
     pub async fn into_future(self) -> T {
         poll_fn(|ctx| {
             self.queue.run(

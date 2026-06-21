@@ -1,6 +1,6 @@
 [package]
 name = "moirai-bevy"
-version = "0.8.4"
+version = "0.8.5"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Moirai plugin for Bevy game engine"
@@ -12,4 +12,4 @@ readme = "../../README.md"
 
 [dependencies]
 moirai = { version = "0.8", path = "../_" }
-bevy = { version = "0.18", default-features = false }
+bevy = { version = "0.19", default-features = false }

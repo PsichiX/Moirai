@@ -38,12 +38,8 @@ fn setup(
     let player_dialogue = commands
         .spawn((
             Text2d::default(),
-            TextFont {
-                font: font.clone(),
-                font_size: 20.0,
-                ..Default::default()
-            },
-            TextLayout::new_with_justify(Justify::Center).with_no_wrap(),
+            TextFont::from_font_size(20.0).with_font(font.clone()),
+            TextLayout::justify(Justify::Center).with_no_wrap(),
             TextColor::WHITE,
             Transform::from_xyz(0.0, 50.0, 0.0),
         ))
@@ -61,12 +57,8 @@ fn setup(
     let enemy_dialogue = commands
         .spawn((
             Text2d::default(),
-            TextFont {
-                font: font.clone(),
-                font_size: 20.0,
-                ..Default::default()
-            },
-            TextLayout::new_with_justify(Justify::Center).with_no_wrap(),
+            TextFont::from_font_size(20.0).with_font(font.clone()),
+            TextLayout::justify(Justify::Center).with_no_wrap(),
             TextColor::WHITE,
             Transform::from_xyz(0.0, 50.0, 0.0),
         ))
