@@ -16,8 +16,8 @@
         <link rel="icon" href="favicon-de23e50b.svg">
         <link rel="shortcut icon" href="favicon-8114d1fc.png">
         <link rel="stylesheet" href="css/variables-8adf115d.css">
-        <link rel="stylesheet" href="css/general-2459343d.css">
-        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/general-0392ca55.css">
+        <link rel="stylesheet" href="css/chrome-fc474251.css">
         <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "ayu";
             const default_dark_theme = "ayu";
-            window.path_to_searchindex_js = "searchindex-01ec63b2.js";
+            window.path_to_searchindex_js = "searchindex-b47f04bd.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-aa509158.js"></script>
+        <script src="toc-13506f68.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -5708,7 +5708,7 @@
 </span><span class="boring">async fn sword_swing(this: AsyncShared&lt;Character&gt;, target: AsyncShared&lt;Character&gt;) {
 </span><span class="boring">    {
 </span><span class="boring">        let mut target = target.write().unwrap();
-</span><span class="boring">        target.health = target.health.saturating_sub(10).max(0);
+</span><span class="boring">        target.health = target.health.saturating_sub(10);
 </span><span class="boring">    }
 </span><span class="boring">
 </span><span class="boring">    log(format!(
@@ -5751,7 +5751,7 @@
 </span><span class="boring">    for index in 0..6 {
 </span><span class="boring">        {
 </span><span class="boring">            let mut target = target.write().unwrap();
-</span><span class="boring">            target.health = target.health.saturating_sub(5).max(0);
+</span><span class="boring">            target.health = target.health.saturating_sub(5);
 </span><span class="boring">        }
 </span><span class="boring">
 </span><span class="boring">        log(format!(
@@ -5800,7 +5800,7 @@
 </span><span class="boring">        {
 </span><span class="boring">            // Deal high damage to target.
 </span><span class="boring">            let mut target = target.write().unwrap();
-</span><span class="boring">            target.health = target.health.saturating_sub(20).max(0);
+</span><span class="boring">            target.health = target.health.saturating_sub(20);
 </span><span class="boring">        }
 </span><span class="boring">
 </span><span class="boring">        log(format!(
@@ -6340,7 +6340,7 @@
 </span><span class="boring">async fn sword_swing(this: AsyncShared&lt;Character&gt;, target: AsyncShared&lt;Character&gt;) {
 </span><span class="boring">    {
 </span><span class="boring">        let mut target = target.write().unwrap();
-</span><span class="boring">        target.health = target.health.saturating_sub(10).max(0);
+</span><span class="boring">        target.health = target.health.saturating_sub(10);
 </span><span class="boring">    }
 </span><span class="boring">
 </span><span class="boring">    log(format!(
@@ -6383,7 +6383,7 @@
 </span><span class="boring">    for index in 0..6 {
 </span><span class="boring">        {
 </span><span class="boring">            let mut target = target.write().unwrap();
-</span><span class="boring">            target.health = target.health.saturating_sub(5).max(0);
+</span><span class="boring">            target.health = target.health.saturating_sub(5);
 </span><span class="boring">        }
 </span><span class="boring">
 </span><span class="boring">        log(format!(
@@ -6432,7 +6432,7 @@
 </span><span class="boring">        {
 </span><span class="boring">            // Deal high damage to target.
 </span><span class="boring">            let mut target = target.write().unwrap();
-</span><span class="boring">            target.health = target.health.saturating_sub(20).max(0);
+</span><span class="boring">            target.health = target.health.saturating_sub(20);
 </span><span class="boring">        }
 </span><span class="boring">
 </span><span class="boring">        log(format!(
@@ -6972,7 +6972,7 @@
 </span><span class="boring">async fn sword_swing(this: AsyncShared&lt;Character&gt;, target: AsyncShared&lt;Character&gt;) {
 </span><span class="boring">    {
 </span><span class="boring">        let mut target = target.write().unwrap();
-</span><span class="boring">        target.health = target.health.saturating_sub(10).max(0);
+</span><span class="boring">        target.health = target.health.saturating_sub(10);
 </span><span class="boring">    }
 </span><span class="boring">
 </span><span class="boring">    log(format!(
@@ -7015,7 +7015,7 @@
 </span><span class="boring">    for index in 0..6 {
 </span><span class="boring">        {
 </span><span class="boring">            let mut target = target.write().unwrap();
-</span><span class="boring">            target.health = target.health.saturating_sub(5).max(0);
+</span><span class="boring">            target.health = target.health.saturating_sub(5);
 </span><span class="boring">        }
 </span><span class="boring">
 </span><span class="boring">        log(format!(
@@ -7064,7 +7064,7 @@
 </span><span class="boring">        {
 </span><span class="boring">            // Deal high damage to target.
 </span><span class="boring">            let mut target = target.write().unwrap();
-</span><span class="boring">            target.health = target.health.saturating_sub(20).max(0);
+</span><span class="boring">            target.health = target.health.saturating_sub(20);
 </span><span class="boring">        }
 </span><span class="boring">
 </span><span class="boring">        log(format!(
@@ -7605,7 +7605,7 @@
 </span><span class="boring">async fn sword_swing(this: AsyncShared&lt;Character&gt;, target: AsyncShared&lt;Character&gt;) {
 </span><span class="boring">    {
 </span><span class="boring">        let mut target = target.write().unwrap();
-</span><span class="boring">        target.health = target.health.saturating_sub(10).max(0);
+</span><span class="boring">        target.health = target.health.saturating_sub(10);
 </span><span class="boring">    }
 </span><span class="boring">
 </span><span class="boring">    log(format!(
@@ -7648,7 +7648,7 @@
 </span><span class="boring">    for index in 0..6 {
 </span><span class="boring">        {
 </span><span class="boring">            let mut target = target.write().unwrap();
-</span><span class="boring">            target.health = target.health.saturating_sub(5).max(0);
+</span><span class="boring">            target.health = target.health.saturating_sub(5);
 </span><span class="boring">        }
 </span><span class="boring">
 </span><span class="boring">        log(format!(
@@ -7697,7 +7697,7 @@
         {
             // Deal high damage to target.
             let mut target = target.write().unwrap();
-            target.health = target.health.saturating_sub(20).max(0);
+            target.health = target.health.saturating_sub(20);
         }
 
         log(format!(
@@ -8237,7 +8237,7 @@
 </span><span class="boring">async fn sword_swing(this: AsyncShared&lt;Character&gt;, target: AsyncShared&lt;Character&gt;) {
 </span><span class="boring">    {
 </span><span class="boring">        let mut target = target.write().unwrap();
-</span><span class="boring">        target.health = target.health.saturating_sub(10).max(0);
+</span><span class="boring">        target.health = target.health.saturating_sub(10);
 </span><span class="boring">    }
 </span><span class="boring">
 </span><span class="boring">    log(format!(
@@ -8280,7 +8280,7 @@
 </span><span class="boring">    for index in 0..6 {
 </span><span class="boring">        {
 </span><span class="boring">            let mut target = target.write().unwrap();
-</span><span class="boring">            target.health = target.health.saturating_sub(5).max(0);
+</span><span class="boring">            target.health = target.health.saturating_sub(5);
 </span><span class="boring">        }
 </span><span class="boring">
 </span><span class="boring">        log(format!(
@@ -8329,7 +8329,7 @@
 </span><span class="boring">        {
 </span><span class="boring">            // Deal high damage to target.
 </span><span class="boring">            let mut target = target.write().unwrap();
-</span><span class="boring">            target.health = target.health.saturating_sub(20).max(0);
+</span><span class="boring">            target.health = target.health.saturating_sub(20);
 </span><span class="boring">        }
 </span><span class="boring">
 </span><span class="boring">        log(format!(
@@ -8870,7 +8870,7 @@
 </span><span class="boring">async fn sword_swing(this: AsyncShared&lt;Character&gt;, target: AsyncShared&lt;Character&gt;) {
 </span><span class="boring">    {
 </span><span class="boring">        let mut target = target.write().unwrap();
-</span><span class="boring">        target.health = target.health.saturating_sub(10).max(0);
+</span><span class="boring">        target.health = target.health.saturating_sub(10);
 </span><span class="boring">    }
 </span><span class="boring">
 </span><span class="boring">    log(format!(
@@ -8913,7 +8913,7 @@
 </span><span class="boring">    for index in 0..6 {
 </span><span class="boring">        {
 </span><span class="boring">            let mut target = target.write().unwrap();
-</span><span class="boring">            target.health = target.health.saturating_sub(5).max(0);
+</span><span class="boring">            target.health = target.health.saturating_sub(5);
 </span><span class="boring">        }
 </span><span class="boring">
 </span><span class="boring">        log(format!(
@@ -8962,7 +8962,7 @@
 </span><span class="boring">        {
 </span><span class="boring">            // Deal high damage to target.
 </span><span class="boring">            let mut target = target.write().unwrap();
-</span><span class="boring">            target.health = target.health.saturating_sub(20).max(0);
+</span><span class="boring">            target.health = target.health.saturating_sub(20);
 </span><span class="boring">        }
 </span><span class="boring">
 </span><span class="boring">        log(format!(
@@ -9498,7 +9498,7 @@
 </span><span class="boring">async fn sword_swing(this: AsyncShared&lt;Character&gt;, target: AsyncShared&lt;Character&gt;) {
 </span><span class="boring">    {
 </span><span class="boring">        let mut target = target.write().unwrap();
-</span><span class="boring">        target.health = target.health.saturating_sub(10).max(0);
+</span><span class="boring">        target.health = target.health.saturating_sub(10);
 </span><span class="boring">    }
 </span><span class="boring">
 </span><span class="boring">    log(format!(
@@ -9541,7 +9541,7 @@
 </span><span class="boring">    for index in 0..6 {
 </span><span class="boring">        {
 </span><span class="boring">            let mut target = target.write().unwrap();
-</span><span class="boring">            target.health = target.health.saturating_sub(5).max(0);
+</span><span class="boring">            target.health = target.health.saturating_sub(5);
 </span><span class="boring">        }
 </span><span class="boring">
 </span><span class="boring">        log(format!(
@@ -9590,7 +9590,7 @@
 </span><span class="boring">        {
 </span><span class="boring">            // Deal high damage to target.
 </span><span class="boring">            let mut target = target.write().unwrap();
-</span><span class="boring">            target.health = target.health.saturating_sub(20).max(0);
+</span><span class="boring">            target.health = target.health.saturating_sub(20);
 </span><span class="boring">        }
 </span><span class="boring">
 </span><span class="boring">        log(format!(
@@ -10126,7 +10126,7 @@
 </span><span class="boring">async fn sword_swing(this: AsyncShared&lt;Character&gt;, target: AsyncShared&lt;Character&gt;) {
 </span><span class="boring">    {
 </span><span class="boring">        let mut target = target.write().unwrap();
-</span><span class="boring">        target.health = target.health.saturating_sub(10).max(0);
+</span><span class="boring">        target.health = target.health.saturating_sub(10);
 </span><span class="boring">    }
 </span><span class="boring">
 </span><span class="boring">    log(format!(
@@ -10169,7 +10169,7 @@
 </span><span class="boring">    for index in 0..6 {
 </span><span class="boring">        {
 </span><span class="boring">            let mut target = target.write().unwrap();
-</span><span class="boring">            target.health = target.health.saturating_sub(5).max(0);
+</span><span class="boring">            target.health = target.health.saturating_sub(5);
 </span><span class="boring">        }
 </span><span class="boring">
 </span><span class="boring">        log(format!(
@@ -10218,7 +10218,7 @@
 </span><span class="boring">        {
 </span><span class="boring">            // Deal high damage to target.
 </span><span class="boring">            let mut target = target.write().unwrap();
-</span><span class="boring">            target.health = target.health.saturating_sub(20).max(0);
+</span><span class="boring">            target.health = target.health.saturating_sub(20);
 </span><span class="boring">        }
 </span><span class="boring">
 </span><span class="boring">        log(format!(
@@ -12952,12 +12952,8 @@ async fn main() {
 </span><span class="boring">    let player_dialogue = commands
 </span><span class="boring">        .spawn((
 </span><span class="boring">            Text2d::default(),
-</span><span class="boring">            TextFont {
-</span><span class="boring">                font: font.clone(),
-</span><span class="boring">                font_size: 20.0,
-</span><span class="boring">                ..Default::default()
-</span><span class="boring">            },
-</span><span class="boring">            TextLayout::new_with_justify(Justify::Center).with_no_wrap(),
+</span><span class="boring">            TextFont::from_font_size(20.0).with_font(font.clone()),
+</span><span class="boring">            TextLayout::justify(Justify::Center).with_no_wrap(),
 </span><span class="boring">            TextColor::WHITE,
 </span><span class="boring">            Transform::from_xyz(0.0, 50.0, 0.0),
 </span><span class="boring">        ))
@@ -12975,12 +12971,8 @@ async fn main() {
 </span><span class="boring">    let enemy_dialogue = commands
 </span><span class="boring">        .spawn((
 </span><span class="boring">            Text2d::default(),
-</span><span class="boring">            TextFont {
-</span><span class="boring">                font: font.clone(),
-</span><span class="boring">                font_size: 20.0,
-</span><span class="boring">                ..Default::default()
-</span><span class="boring">            },
-</span><span class="boring">            TextLayout::new_with_justify(Justify::Center).with_no_wrap(),
+</span><span class="boring">            TextFont::from_font_size(20.0).with_font(font.clone()),
+</span><span class="boring">            TextLayout::justify(Justify::Center).with_no_wrap(),
 </span><span class="boring">            TextColor::WHITE,
 </span><span class="boring">            Transform::from_xyz(0.0, 50.0, 0.0),
 </span><span class="boring">        ))
@@ -13124,12 +13116,8 @@ async fn main() {
     let player_dialogue = commands
         .spawn((
             Text2d::default(),
-            TextFont {
-                font: font.clone(),
-                font_size: 20.0,
-                ..Default::default()
-            },
-            TextLayout::new_with_justify(Justify::Center).with_no_wrap(),
+            TextFont::from_font_size(20.0).with_font(font.clone()),
+            TextLayout::justify(Justify::Center).with_no_wrap(),
             TextColor::WHITE,
             Transform::from_xyz(0.0, 50.0, 0.0),
         ))
@@ -13147,12 +13135,8 @@ async fn main() {
     let enemy_dialogue = commands
         .spawn((
             Text2d::default(),
-            TextFont {
-                font: font.clone(),
-                font_size: 20.0,
-                ..Default::default()
-            },
-            TextLayout::new_with_justify(Justify::Center).with_no_wrap(),
+            TextFont::from_font_size(20.0).with_font(font.clone()),
+            TextLayout::justify(Justify::Center).with_no_wrap(),
             TextColor::WHITE,
             Transform::from_xyz(0.0, 50.0, 0.0),
         ))
@@ -13296,12 +13280,8 @@ async fn main() {
 </span><span class="boring">    let player_dialogue = commands
 </span><span class="boring">        .spawn((
 </span><span class="boring">            Text2d::default(),
-</span><span class="boring">            TextFont {
-</span><span class="boring">                font: font.clone(),
-</span><span class="boring">                font_size: 20.0,
-</span><span class="boring">                ..Default::default()
-</span><span class="boring">            },
-</span><span class="boring">            TextLayout::new_with_justify(Justify::Center).with_no_wrap(),
+</span><span class="boring">            TextFont::from_font_size(20.0).with_font(font.clone()),
+</span><span class="boring">            TextLayout::justify(Justify::Center).with_no_wrap(),
 </span><span class="boring">            TextColor::WHITE,
 </span><span class="boring">            Transform::from_xyz(0.0, 50.0, 0.0),
 </span><span class="boring">        ))
@@ -13319,12 +13299,8 @@ async fn main() {
 </span><span class="boring">    let enemy_dialogue = commands
 </span><span class="boring">        .spawn((
 </span><span class="boring">            Text2d::default(),
-</span><span class="boring">            TextFont {
-</span><span class="boring">                font: font.clone(),
-</span><span class="boring">                font_size: 20.0,
-</span><span class="boring">                ..Default::default()
-</span><span class="boring">            },
-</span><span class="boring">            TextLayout::new_with_justify(Justify::Center).with_no_wrap(),
+</span><span class="boring">            TextFont::from_font_size(20.0).with_font(font.clone()),
+</span><span class="boring">            TextLayout::justify(Justify::Center).with_no_wrap(),
 </span><span class="boring">            TextColor::WHITE,
 </span><span class="boring">            Transform::from_xyz(0.0, 50.0, 0.0),
 </span><span class="boring">        ))
@@ -13468,12 +13444,8 @@ async fn main() {
 </span><span class="boring">    let player_dialogue = commands
 </span><span class="boring">        .spawn((
 </span><span class="boring">            Text2d::default(),
-</span><span class="boring">            TextFont {
-</span><span class="boring">                font: font.clone(),
-</span><span class="boring">                font_size: 20.0,
-</span><span class="boring">                ..Default::default()
-</span><span class="boring">            },
-</span><span class="boring">            TextLayout::new_with_justify(Justify::Center).with_no_wrap(),
+</span><span class="boring">            TextFont::from_font_size(20.0).with_font(font.clone()),
+</span><span class="boring">            TextLayout::justify(Justify::Center).with_no_wrap(),
 </span><span class="boring">            TextColor::WHITE,
 </span><span class="boring">            Transform::from_xyz(0.0, 50.0, 0.0),
 </span><span class="boring">        ))
@@ -13491,12 +13463,8 @@ async fn main() {
 </span><span class="boring">    let enemy_dialogue = commands
 </span><span class="boring">        .spawn((
 </span><span class="boring">            Text2d::default(),
-</span><span class="boring">            TextFont {
-</span><span class="boring">                font: font.clone(),
-</span><span class="boring">                font_size: 20.0,
-</span><span class="boring">                ..Default::default()
-</span><span class="boring">            },
-</span><span class="boring">            TextLayout::new_with_justify(Justify::Center).with_no_wrap(),
+</span><span class="boring">            TextFont::from_font_size(20.0).with_font(font.clone()),
+</span><span class="boring">            TextLayout::justify(Justify::Center).with_no_wrap(),
 </span><span class="boring">            TextColor::WHITE,
 </span><span class="boring">            Transform::from_xyz(0.0, 50.0, 0.0),
 </span><span class="boring">        ))
@@ -13619,6 +13587,9 @@ async fn main() {
 </blockquote>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="saving-and-loading-running-jobs"><a class="header" href="#saving-and-loading-running-jobs">Saving and loading running jobs</a></h1>
+<blockquote>
+<p>TODO</p>
+</blockquote>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="common-bugs-and-anti-patterns"><a class="header" href="#common-bugs-and-anti-patterns">Common bugs and anti-patterns</a></h1>
 <blockquote>
@@ -13667,11 +13638,11 @@ async fn main() {
 
         <script src="elasticlunr-ef4e11c1.min.js"></script>
         <script src="mark-09e88c2c.min.js"></script>
-        <script src="searcher-c2a407aa.js"></script>
+        <script src="searcher-09f2665d.js"></script>
 
         <script src="clipboard-1626706a.min.js"></script>
         <script src="highlight-abc7f01d.js"></script>
-        <script src="book-a0b12cfe.js"></script>
+        <script src="book-c22b7243.js"></script>
 
         <!-- Custom JS scripts -->
 
