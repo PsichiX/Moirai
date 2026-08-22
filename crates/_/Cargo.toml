@@ -1,6 +1,6 @@
 [package]
 name = "moirai"
-version = "0.8.5"
+version = "0.8.6"
 edition = "2024"
 authors = ["Patryk 'PsichiX' Budzynski <psichix@gmail.com>"]
 description = "Async/await job system for game development"
@@ -16,7 +16,7 @@ tracing = ["dep:tracing"]
 deadlock-trace = []
 
 [dependencies]
-intuicio-data = "0.52"
+intuicio-data = "0.53"
 typid = "1"
 tracing = { version = "0.1", optional = true }
 
